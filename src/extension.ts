@@ -7,9 +7,11 @@ import {
   buildReviewPrompt,
   FileChange,
   parseReviewResponse,
+  retainChangedViewedFiles,
   relocateAnchor,
   REVIEW_OUTPUT_SCHEMA,
   ReviewComment,
+  setFileViewed,
   VirtualPrState,
 } from './core';
 import { CodexAppServer, discoverCodexPath } from './codex';
@@ -93,6 +95,8 @@ class VirtualPrController implements vscode.Disposable {
       vscode.commands.registerCommand('virtualPr.refresh', () => this.refresh(true)),
       vscode.commands.registerCommand('virtualPr.openDiff', (change: FileChange) => this.openDiff(change)),
       vscode.commands.registerCommand('virtualPr.openSource', (target: FileChange | ReviewComment) => this.openSource(target)),
+      vscode.commands.registerCommand('virtualPr.markViewed', (change: FileChange) => this.setViewed(change, true)),
+      vscode.commands.registerCommand('virtualPr.unmarkViewed', (change: FileChange) => this.setViewed(change, false)),
       vscode.commands.registerCommand('virtualPr.addComment', (reply?: vscode.CommentReply) => this.addComment(reply)),
       vscode.commands.registerCommand('virtualPr.resolveComment', (comment: ReviewComment) => this.setCommentStatus(comment, 'resolved')),
       vscode.commands.registerCommand('virtualPr.reopenComment', (comment: ReviewComment) => this.setCommentStatus(comment, 'open')),
@@ -153,6 +157,7 @@ class VirtualPrController implements vscode.Disposable {
       createdAt: new Date().toISOString(),
       status: 'review-ready',
       comments: [],
+      viewedFiles: [],
     };
     await this.save();
     await this.refresh(false);
@@ -167,6 +172,7 @@ class VirtualPrController implements vscode.Disposable {
       return;
     }
     this.changes = await this.git.changedFiles(this.state.baseCommit);
+    this.state.viewedFiles = retainChangedViewedFiles(this.state.viewedFiles || [], this.changes);
     this.comments.options = {
       prompt: 'Add a local Virtual PR review comment',
       placeHolder: 'Describe the change Codex should make',
@@ -220,6 +226,16 @@ class VirtualPrController implements vscode.Disposable {
     } catch (error) {
       void vscode.window.showErrorMessage(`Cannot open ${file}: ${String(error)}`);
     }
+  }
+
+  private async setViewed(change: FileChange | undefined, viewed: boolean): Promise<void> {
+    const state = this.requireState();
+    if (!state || !change?.path || !this.changes.some((candidate) => candidate.path === change.path)) {
+      return;
+    }
+    state.viewedFiles = setFileViewed(state.viewedFiles || [], change.path, viewed);
+    await this.save();
+    this.tree.refresh();
   }
 
   private async addComment(reply?: vscode.CommentReply): Promise<void> {

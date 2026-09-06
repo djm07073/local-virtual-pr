@@ -76,6 +76,31 @@ export interface VirtualPrState {
   status: VirtualPrStatus;
   codexThreadId?: string;
   comments: ReviewComment[];
+  viewedFiles?: string[];
+}
+
+export function setFileViewed(
+  viewedFiles: readonly string[],
+  file: string,
+  viewed: boolean,
+): string[] {
+  const next = new Set(viewedFiles);
+  if (viewed) {
+    next.add(file);
+  } else {
+    next.delete(file);
+  }
+  return [...next].sort((left, right) => left.localeCompare(right));
+}
+
+export function retainChangedViewedFiles(
+  viewedFiles: readonly string[],
+  changes: readonly FileChange[],
+): string[] {
+  const changed = new Set(changes.map((change) => change.path));
+  return [...new Set(viewedFiles)]
+    .filter((file) => changed.has(file))
+    .sort((left, right) => left.localeCompare(right));
 }
 
 export function parseNameStatusZ(output: string): FileChange[] {

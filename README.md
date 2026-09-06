@@ -8,6 +8,7 @@ VS Code에서 로컬 AI 변경사항을 Pull Request처럼 검토하는 비공�
 
 - Git 기준 ref와 현재 working tree 사이의 Virtual PR 생성
 - 변경 파일 목록과 diff 제공
+- 파일별 Viewed 표시와 검토 진행률 제공
 - 실제 source editor에서 심볼 탐색 지원
 - 변경된 줄을 드래그하고 gutter `+`를 눌러 로컬 리뷰 댓글 작성
 - 여러 리뷰 댓글을 같은 Codex 세션으로 전달
@@ -39,7 +40,7 @@ VS Code에서 로컬 AI 변경사항을 Pull Request처럼 검토하는 비공�
 ### 터미널에서 설치
 
 ```sh
-code --install-extension ./local-virtual-pr-0.3.0.vsix
+code --install-extension ./local-virtual-pr-0.4.0.vsix
 ```
 
 제거하려면:
@@ -62,6 +63,9 @@ Virtual PR을 다시 생성하면 기존 로컬 리뷰 댓글과 연결된 Codex
 ### 2. 변경사항 검토하기
 
 - 왼쪽 **Changes**에서 파일을 클릭하면 diff가 열립니다.
+- 검토를 마친 파일은 파일 행의 체크 버튼 또는 우클릭 **Mark File as Viewed**로 표시합니다.
+- Viewed 파일에는 체크 아이콘과 `Viewed` 문구가 나타나며, Changes 제목에서 `viewed/전체` 진행률을 확인할 수 있습니다.
+- 다시 검토해야 하면 파일 행의 해제 버튼 또는 **Mark File as Unviewed**를 실행합니다.
 - 심볼 탐색이 필요하면 파일의 **Open Navigable Source** 명령을 실행합니다.
 - 실제 source editor에서는 다음 기능을 그대로 사용할 수 있습니다.
   - Go to Definition
@@ -135,7 +139,7 @@ npx vsce package --no-dependencies
 생성된 VSIX는 다음 명령으로 설치할 수 있습니다.
 
 ```sh
-code --install-extension ./local-virtual-pr-0.3.0.vsix --force
+code --install-extension ./local-virtual-pr-0.4.0.vsix --force
 ```
 
 ## 제한사항

@@ -5,8 +5,8 @@ import { FileChange, ReviewComment, VirtualPrState } from './core';
 type TreeNode =
   | { type: 'create' }
   | { type: 'summary'; state: VirtualPrState }
-  | { type: 'group'; group: 'changes' | 'comments'; count: number }
-  | { type: 'change'; change: FileChange }
+  | { type: 'group'; group: 'changes' | 'comments'; count: number; viewedCount?: number }
+  | { type: 'change'; change: FileChange; viewed: boolean }
   | { type: 'comment'; comment: ReviewComment };
 
 export class ReviewTreeProvider implements vscode.TreeDataProvider<TreeNode> {
@@ -38,19 +38,30 @@ export class ReviewTreeProvider implements vscode.TreeDataProvider<TreeNode> {
     }
     if (node.type === 'group') {
       const label = node.group === 'changes' ? 'Changes' : 'Review comments';
-      const item = new vscode.TreeItem(`${label} (${node.count})`, vscode.TreeItemCollapsibleState.Expanded);
+      const count = node.group === 'changes'
+        ? `${node.viewedCount || 0}/${node.count} viewed`
+        : `${node.count}`;
+      const item = new vscode.TreeItem(`${label} (${count})`, vscode.TreeItemCollapsibleState.Expanded);
       item.iconPath = new vscode.ThemeIcon(node.group === 'changes' ? 'files' : 'comment-discussion');
       return item;
     }
     if (node.type === 'change') {
       const item = new vscode.TreeItem(path.basename(node.change.path));
-      item.description = `${node.change.kind}  ${path.dirname(node.change.path) === '.' ? '' : path.dirname(node.change.path)}`;
-      item.tooltip = node.change.previousPath
+      const directory = path.dirname(node.change.path) === '.' ? '' : path.dirname(node.change.path);
+      item.description = `${node.viewed ? 'Viewed · ' : ''}${node.change.kind}  ${directory}`;
+      const location = node.change.previousPath
         ? `${node.change.previousPath} → ${node.change.path}`
         : node.change.path;
-      item.iconPath = new vscode.ThemeIcon(node.change.kind === 'D' ? 'diff-removed' : node.change.kind === 'A' ? 'diff-added' : 'diff-modified');
+      item.tooltip = node.viewed ? `Viewed\n${location}` : location;
+      item.iconPath = new vscode.ThemeIcon(node.viewed
+        ? 'check'
+        : node.change.kind === 'D'
+          ? 'diff-removed'
+          : node.change.kind === 'A'
+            ? 'diff-added'
+            : 'diff-modified');
       item.command = { command: 'virtualPr.openDiff', title: 'Open Diff', arguments: [node.change] };
-      item.contextValue = 'virtualPr.change';
+      item.contextValue = `virtualPr.change.${node.viewed ? 'viewed' : 'unviewed'}`;
       return item;
     }
 
@@ -70,14 +81,19 @@ export class ReviewTreeProvider implements vscode.TreeDataProvider<TreeNode> {
       return node ? [] : [{ type: 'create' }];
     }
     if (!node) {
+      const viewedCount = this.changes().filter((change) => current.viewedFiles?.includes(change.path)).length;
       return [
         { type: 'summary', state: current },
-        { type: 'group', group: 'changes', count: this.changes().length },
+        { type: 'group', group: 'changes', count: this.changes().length, viewedCount },
         { type: 'group', group: 'comments', count: current.comments.length },
       ];
     }
     if (node.type === 'group' && node.group === 'changes') {
-      return this.changes().map((change) => ({ type: 'change', change }));
+      return this.changes().map((change) => ({
+        type: 'change',
+        change,
+        viewed: current.viewedFiles?.includes(change.path) || false,
+      }));
     }
     if (node.type === 'group' && node.group === 'comments') {
       return current.comments.map((comment) => ({ type: 'comment', comment }));

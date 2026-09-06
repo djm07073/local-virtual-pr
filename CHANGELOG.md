@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- Mark changed files as Viewed or Unviewed from the review tree.
+- Show per-file Viewed status and reviewed-file progress in the Changes group.
+
 ## 0.3.0
 
 - Add native VS Code commenting ranges on changed lines so a dragged selection can be reviewed from the gutter `+` button.

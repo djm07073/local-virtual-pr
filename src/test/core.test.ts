@@ -8,8 +8,10 @@ import {
   parseHeadRanges,
   parseNameStatusZ,
   parseReviewResponse,
+  retainChangedViewedFiles,
   relocateAnchor,
   ReviewComment,
+  setFileViewed,
 } from '../core';
 
 test('Codex discovery rejects legacy CLI help that lacks app-server support', () => {
@@ -45,6 +47,18 @@ test('head range parsing highlights added and modified lines but not pure deleti
     { start: 2, end: 4 },
     { start: 14, end: 14 },
   ]);
+});
+
+test('viewed files can be toggled and stale paths are removed', () => {
+  const viewed = setFileViewed([], 'src/second.ts', true);
+  const withTwo = setFileViewed(viewed, 'src/first.ts', true);
+
+  assert.deepEqual(withTwo, ['src/first.ts', 'src/second.ts']);
+  assert.deepEqual(setFileViewed(withTwo, 'src/first.ts', false), ['src/second.ts']);
+  assert.deepEqual(retainChangedViewedFiles(
+    ['src/deleted.ts', 'src/second.ts', 'src/second.ts'],
+    [{ kind: 'M', path: 'src/second.ts' }, { kind: 'A', path: 'src/new.ts' }],
+  ), ['src/second.ts']);
 });
 
 test('review prompt includes unresolved source context and excludes resolved comments', () => {
