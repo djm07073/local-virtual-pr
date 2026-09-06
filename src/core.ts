@@ -19,6 +19,7 @@ export interface ReviewReply {
   message: string;
   createdAt: string;
   updatedAt?: string;
+  pending?: boolean;
 }
 
 export interface ReviewComment {
@@ -139,7 +140,7 @@ export function editReviewMessage(
         throw new Error('Codex replies cannot be edited.');
       }
       found = true;
-      return { ...reply, message: normalized, updatedAt };
+      return { ...reply, message: normalized, updatedAt, pending: true };
     });
     return { ...comment, replies };
   });
@@ -148,6 +149,21 @@ export function editReviewMessage(
     throw new Error('Unknown review comment or reply.');
   }
   return updated;
+}
+
+export function markReviewerRepliesSent(
+  comments: readonly ReviewComment[],
+  commentIds: readonly string[],
+): ReviewComment[] {
+  const completed = new Set(commentIds);
+  return comments.map((comment) => completed.has(comment.id)
+    ? {
+      ...comment,
+      replies: comment.replies?.map((reply) => reply.author === 'reviewer' && reply.pending
+        ? { ...reply, pending: false }
+        : reply),
+    }
+    : comment);
 }
 
 export function parseNameStatusZ(output: string): FileChange[] {
@@ -261,9 +277,12 @@ export function buildReviewPrompt(comments: readonly ReviewComment[]): string {
       comment.selectedCode,
       ...comment.contextAfter,
     ].join('\n');
-    const conversation = (comment.replies || []).map((reply) =>
-      `${reply.author === 'codex' ? 'Codex' : 'Reviewer'}: ${reply.message}`,
-    );
+    const conversation = (comment.replies || []).map((reply) => {
+      const author = reply.author === 'codex'
+        ? 'Codex'
+        : reply.pending ? 'Reviewer (new follow-up)' : 'Reviewer';
+      return `${author}: ${reply.message}`;
+    });
 
     return [
       `${index + 1}. [${comment.id}] ${location}`,
@@ -278,40 +297,12 @@ export function buildReviewPrompt(comments: readonly ReviewComment[]): string {
 
   return [
     'Address every unresolved local Virtual PR review comment below.',
+    'Treat every Reviewer (new follow-up) message as an additional requirement to address in this turn.',
     'Edit the current workspace directly, preserve unrelated behavior, and run focused verification.',
     'Report how each comment was addressed and which checks ran. Do not mark comments resolved; the human reviewer owns resolution.',
     'Return exactly one concise reply for every listed comment ID using the provided response schema.',
     '',
     ...entries,
-  ].join('\n');
-}
-
-export function buildFollowUpPrompt(comment: ReviewComment): string {
-  const location = comment.status === 'outdated'
-    ? `${comment.file} (originally ${comment.startLine}-${comment.endLine}; anchor is outdated)`
-    : `${comment.file}:${comment.startLine}-${comment.endLine}`;
-  const context = [
-    ...comment.contextBefore,
-    comment.selectedCode,
-    ...comment.contextAfter,
-  ].join('\n');
-  const conversation = (comment.replies || []).map((reply) =>
-    `${reply.author === 'codex' ? 'Codex' : 'Reviewer'}: ${reply.message}`,
-  );
-
-  return [
-    `Continue addressing only local Virtual PR review comment [${comment.id}].`,
-    'Edit the current workspace directly if needed, preserve unrelated behavior, and run focused verification.',
-    'Do not mark the comment resolved; the human reviewer owns resolution.',
-    `Location: ${location}`,
-    `Original review: ${comment.message}`,
-    'Relevant source context:',
-    '```',
-    context,
-    '```',
-    'Review conversation:',
-    ...conversation,
-    `Return a concise reply for comment ID ${comment.id} explaining what changed and which checks ran.`,
   ].join('\n');
 }
 

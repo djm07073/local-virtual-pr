@@ -3,10 +3,10 @@ import path from 'node:path';
 import * as vscode from 'vscode';
 import {
   appendReviewReply,
-  buildFollowUpPrompt,
   buildReviewPrompt,
   editReviewMessage,
   FileChange,
+  markReviewerRepliesSent,
   parseReviewResponse,
   retainChangedViewedFiles,
   relocateAnchor,
@@ -109,7 +109,7 @@ class VirtualPrController implements vscode.Disposable {
       vscode.commands.registerCommand('virtualPr.reopenComment', (target: ReviewComment | vscode.CommentThread | TreeNode) => this.setCommentStatus(target, 'open')),
       vscode.commands.registerCommand('virtualPr.askAI', () => this.askAI()),
       vscode.commands.registerCommand('virtualPr.sendReview', () => this.sendReview()),
-      vscode.commands.registerCommand('virtualPr.replyToComment', (reply: vscode.CommentReply) => this.sendReview(reply)),
+      vscode.commands.registerCommand('virtualPr.replyToComment', (reply: vscode.CommentReply) => this.addReply(reply)),
       vscode.commands.registerCommand('virtualPr.approve', () => this.approve()),
       vscode.commands.registerCommand('virtualPr.showOutput', () => this.output.show()),
       vscode.window.onDidChangeActiveTextEditor((editor) => void this.decorate(editor)),
@@ -429,7 +429,7 @@ class VirtualPrController implements vscode.Disposable {
     await this.runAgent(task.trim());
   }
 
-  private async sendReview(reply?: vscode.CommentReply): Promise<void> {
+  private async addReply(reply: vscode.CommentReply): Promise<void> {
     const state = this.requireState();
     if (!state) {
       return;
@@ -439,29 +439,34 @@ class VirtualPrController implements vscode.Disposable {
       return;
     }
 
-    if (reply) {
-      const commentId = [...this.commentThreads].find(([, thread]) => thread === reply.thread)?.[0];
-      const message = reply.text.trim();
-      if (!commentId || !message) {
-        return;
-      }
-      state.comments = appendReviewReply(state.comments, commentId, {
-        id: crypto.randomUUID(),
-        author: 'reviewer',
-        message,
-        createdAt: new Date().toISOString(),
-      });
-      state.status = 'changes-requested';
-      await this.save();
-      await this.renderCommentThreads();
-      this.tree.refresh();
-      const comment = state.comments.find((candidate) => candidate.id === commentId);
-      if (comment) {
-        await this.runAgent(buildFollowUpPrompt(comment), [commentId]);
-      }
+    const commentId = [...this.commentThreads].find(([, thread]) => thread === reply.thread)?.[0];
+    const message = reply.text.trim();
+    const comment = state.comments.find((candidate) => candidate.id === commentId);
+    if (!commentId || !message || !comment || comment.status === 'resolved') {
       return;
     }
+    state.comments = appendReviewReply(state.comments, commentId, {
+      id: crypto.randomUUID(),
+      author: 'reviewer',
+      message,
+      createdAt: new Date().toISOString(),
+      pending: true,
+    });
+    state.status = 'changes-requested';
+    await this.save();
+    await this.renderCommentThreads();
+    this.tree.refresh();
+  }
 
+  private async sendReview(): Promise<void> {
+    const state = this.requireState();
+    if (!state) {
+      return;
+    }
+    if (state.status === 'ai-working') {
+      void vscode.window.showInformationMessage('Codex is already working on this Virtual PR.');
+      return;
+    }
     const unresolved = state.comments.filter((comment) => comment.status !== 'resolved');
     if (unresolved.length === 0) {
       void vscode.window.showInformationMessage('There are no unresolved review comments.');
@@ -502,6 +507,7 @@ class VirtualPrController implements vscode.Disposable {
       let summary = result.message;
       if (reviewCommentIds.length > 0) {
         const response = parseReviewResponse(result.message, reviewCommentIds);
+        state.comments = markReviewerRepliesSent(state.comments, reviewCommentIds);
         for (const reply of response.comments) {
           state.comments = appendReviewReply(state.comments, reply.commentId, {
             id: crypto.randomUUID(),
@@ -608,7 +614,9 @@ class VirtualPrController implements vscode.Disposable {
             contextValue: `virtualPr.reply.${reply.author}`,
             label: reply.author === 'codex'
               ? 'AI response'
-              : reply.updatedAt ? 'follow-up · edited' : 'follow-up',
+              : [reply.pending ? 'pending follow-up' : 'follow-up', reply.updatedAt ? 'edited' : '']
+                .filter(Boolean)
+                .join(' · '),
             timestamp: new Date(reply.createdAt),
           };
           if (reply.author === 'reviewer') {

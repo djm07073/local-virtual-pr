@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+- Save reviewer replies locally without starting Codex immediately.
+- Batch pending follow-ups with all unresolved comments when Send Review to AI is invoked.
+- Keep pending follow-ups queued when Codex execution fails.
+
 ## 0.5.2
 
 - Add native checkboxes for marking changed files as Viewed.

@@ -2,7 +2,7 @@
   "name": "local-virtual-pr",
   "displayName": "Local Virtual PR",
   "description": "Review local AI changes like a pull request while keeping VS Code symbol navigation available.",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "publisher": "local",
   "license": "MIT",
   "repository": {
@@ -93,8 +93,8 @@
       },
       {
         "command": "virtualPr.replyToComment",
-        "title": "Reply and Send to Codex",
-        "icon": "$(send)"
+        "title": "Reply",
+        "icon": "$(reply)"
       },
       {
         "command": "virtualPr.approve",

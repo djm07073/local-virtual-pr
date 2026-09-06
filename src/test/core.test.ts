@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   appendReviewReply,
-  buildFollowUpPrompt,
   buildReviewPrompt,
   editReviewMessage,
   isAppServerHelp,
+  markReviewerRepliesSent,
   parseHeadRanges,
   parseNameStatusZ,
   parseReviewResponse,
@@ -269,6 +269,7 @@ test('editing review messages preserves resolution and protects Codex replies', 
   );
   assert.equal(editedReply[0].replies?.[0].message, 'Updated follow-up.');
   assert.equal(editedReply[0].replies?.[0].updatedAt, '2026-09-06T02:01:00.000Z');
+  assert.equal(editedReply[0].replies?.[0].pending, true);
   assert.throws(
     () => editReviewMessage(
       editedReply,
@@ -280,8 +281,8 @@ test('editing review messages preserves resolution and protects Codex replies', 
   );
 });
 
-test('follow-up prompt keeps the full comment conversation focused on one comment', () => {
-  const prompt = buildFollowUpPrompt({
+test('batch review prompt marks new follow-ups and clears them after delivery', () => {
+  const comments: ReviewComment[] = [{
     id: 'comment-1',
     file: 'src/retry.ts',
     startLine: 10,
@@ -303,16 +304,26 @@ test('follow-up prompt keeps the full comment conversation focused on one commen
         author: 'reviewer',
         message: 'Please add a regression test too.',
         createdAt: '2026-09-06T01:01:00.000Z',
+        pending: true,
       },
     ],
-  });
+  }];
 
-  assert.match(prompt, /only.*\[comment-1\]/i);
+  const prompt = buildReviewPrompt(comments);
+
   assert.match(prompt, /src\/retry\.ts:10-10/);
-  assert.match(prompt, /Original review: Check exhaustion first\./);
+  assert.match(prompt, /Review comment: Check exhaustion first\./);
   assert.match(prompt, /Codex: Moved the exhaustion check\./);
-  assert.match(prompt, /Reviewer: Please add a regression test too\./);
+  assert.match(prompt, /Reviewer \(new follow-up\): Please add a regression test too\./);
   assert.match(prompt, /Do not mark.*resolved/i);
+
+  const delivered = markReviewerRepliesSent(comments, ['comment-1']);
+  assert.equal(delivered[0].replies?.[1].pending, false);
+  assert.match(buildReviewPrompt(delivered), /Reviewer: Please add a regression test too\./);
+  assert.doesNotMatch(
+    buildReviewPrompt(delivered),
+    /Reviewer \(new follow-up\): Please add a regression test too\./,
+  );
 });
 
 test('anchor relocation follows shifted code and rejects missing or ambiguous matches', async (t) => {
