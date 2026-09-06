@@ -4,6 +4,7 @@ import {
   appendReviewReply,
   buildFollowUpPrompt,
   buildReviewPrompt,
+  editReviewMessage,
   isAppServerHelp,
   parseHeadRanges,
   parseNameStatusZ,
@@ -220,6 +221,62 @@ test('appending reviewer and Codex replies preserves order without resolving the
       createdAt: '2026-09-06T01:02:00.000Z',
     }),
     /Unknown review comment/,
+  );
+});
+
+test('editing review messages preserves resolution and protects Codex replies', () => {
+  const comments: ReviewComment[] = [{
+    id: 'comment-1',
+    file: 'src/retry.ts',
+    startLine: 10,
+    endLine: 10,
+    selectedCode: 'await wait(delay);',
+    contextBefore: [],
+    contextAfter: [],
+    message: 'Original review.',
+    status: 'resolved',
+    replies: [
+      {
+        id: 'reviewer-reply',
+        author: 'reviewer',
+        message: 'Original follow-up.',
+        createdAt: '2026-09-06T01:00:00.000Z',
+      },
+      {
+        id: 'codex-reply',
+        author: 'codex',
+        message: 'Codex response.',
+        createdAt: '2026-09-06T01:01:00.000Z',
+      },
+    ],
+  }];
+
+  const editedComment = editReviewMessage(
+    comments,
+    { commentId: 'comment-1' },
+    'Updated review.',
+    '2026-09-06T02:00:00.000Z',
+  );
+  assert.equal(editedComment[0].message, 'Updated review.');
+  assert.equal(editedComment[0].status, 'resolved');
+  assert.equal(editedComment[0].updatedAt, '2026-09-06T02:00:00.000Z');
+
+  const editedReply = editReviewMessage(
+    editedComment,
+    { commentId: 'comment-1', replyId: 'reviewer-reply' },
+    'Updated follow-up.',
+    '2026-09-06T02:01:00.000Z',
+  );
+  assert.equal(editedReply[0].replies?.[0].message, 'Updated follow-up.');
+  assert.equal(editedReply[0].replies?.[0].updatedAt, '2026-09-06T02:01:00.000Z');
+  assert.throws(
+    () => editReviewMessage(
+      editedReply,
+      { commentId: 'comment-1', replyId: 'codex-reply' },
+      'Changed Codex response.',
+      '2026-09-06T02:02:00.000Z',
+    ),
+    /Codex replies cannot be edited/,
   );
 });
 

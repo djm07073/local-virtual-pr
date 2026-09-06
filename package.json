@@ -2,7 +2,7 @@
   "name": "local-virtual-pr",
   "displayName": "Local Virtual PR",
   "description": "Review local AI changes like a pull request while keeping VS Code symbol navigation available.",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "publisher": "local",
   "license": "MIT",
   "repository": {
@@ -65,6 +65,11 @@
         "command": "virtualPr.addComment",
         "title": "Virtual PR: Add Review Comment",
         "enablement": "!commentIsEmpty"
+      },
+      {
+        "command": "virtualPr.editComment",
+        "title": "Virtual PR: Edit Review Comment",
+        "icon": "$(edit)"
       },
       {
         "command": "virtualPr.resolveComment",
@@ -187,6 +192,21 @@
           "command": "virtualPr.reopenComment",
           "when": "view == virtualPr.review && viewItem == virtualPr.comment.resolved",
           "group": "inline@1"
+        },
+        {
+          "command": "virtualPr.editComment",
+          "when": "view == virtualPr.review && viewItem == virtualPr.comment.open",
+          "group": "inline@2"
+        },
+        {
+          "command": "virtualPr.editComment",
+          "when": "view == virtualPr.review && viewItem == virtualPr.comment.outdated",
+          "group": "inline@2"
+        },
+        {
+          "command": "virtualPr.editComment",
+          "when": "view == virtualPr.review && viewItem == virtualPr.comment.resolved",
+          "group": "inline@2"
         }
       ],
       "editor/context": [
@@ -211,6 +231,28 @@
           "command": "virtualPr.replyToComment",
           "when": "commentController == localVirtualPr && commentThread == virtualPr.comment.outdated",
           "group": "inline"
+        }
+      ],
+      "comments/comment/title": [
+        {
+          "command": "virtualPr.editComment",
+          "when": "commentController == localVirtualPr && comment == virtualPr.comment.editable",
+          "group": "navigation"
+        },
+        {
+          "command": "virtualPr.editComment",
+          "when": "commentController == localVirtualPr && comment == virtualPr.reply.reviewer",
+          "group": "navigation"
+        }
+      ],
+      "comments/comment/context": [
+        {
+          "command": "virtualPr.editComment",
+          "when": "commentController == localVirtualPr && comment == virtualPr.comment.editable"
+        },
+        {
+          "command": "virtualPr.editComment",
+          "when": "commentController == localVirtualPr && comment == virtualPr.reply.reviewer"
         }
       ]
     },

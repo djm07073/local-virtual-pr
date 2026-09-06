@@ -5,12 +5,14 @@ import {
   appendReviewReply,
   buildFollowUpPrompt,
   buildReviewPrompt,
+  editReviewMessage,
   FileChange,
   parseReviewResponse,
   retainChangedViewedFiles,
   relocateAnchor,
   REVIEW_OUTPUT_SCHEMA,
   ReviewComment,
+  ReviewMessageTarget,
   setFileViewed,
   VirtualPrState,
 } from './core';
@@ -44,6 +46,7 @@ class VirtualPrController implements vscode.Disposable {
   private readonly output = vscode.window.createOutputChannel('Local Virtual PR');
   private readonly comments = vscode.comments.createCommentController('localVirtualPr', 'Local Virtual PR');
   private readonly commentThreads = new Map<string, vscode.CommentThread>();
+  private renderedCommentTargets = new WeakMap<vscode.Comment, ReviewMessageTarget>();
   private readonly commentingRangeProvider: vscode.CommentingRangeProvider = {
     provideCommentingRanges: async (document) => {
       if (!this.state || !this.isWorkspaceFile(document.uri)) {
@@ -98,6 +101,7 @@ class VirtualPrController implements vscode.Disposable {
       vscode.commands.registerCommand('virtualPr.markViewed', (change: FileChange) => this.setViewed(change, true)),
       vscode.commands.registerCommand('virtualPr.unmarkViewed', (change: FileChange) => this.setViewed(change, false)),
       vscode.commands.registerCommand('virtualPr.addComment', (reply?: vscode.CommentReply) => this.addComment(reply)),
+      vscode.commands.registerCommand('virtualPr.editComment', (target?: ReviewComment | vscode.Comment) => this.editComment(target)),
       vscode.commands.registerCommand('virtualPr.resolveComment', (comment: ReviewComment) => this.setCommentStatus(comment, 'resolved')),
       vscode.commands.registerCommand('virtualPr.reopenComment', (comment: ReviewComment) => this.setCommentStatus(comment, 'open')),
       vscode.commands.registerCommand('virtualPr.askAI', () => this.askAI()),
@@ -298,6 +302,49 @@ class VirtualPrController implements vscode.Disposable {
     this.tree.refresh();
   }
 
+  private async editComment(target: ReviewComment | vscode.Comment | undefined): Promise<void> {
+    const state = this.requireState();
+    if (!state || !target) {
+      return;
+    }
+    const messageTarget: ReviewMessageTarget | undefined = 'id' in target && 'file' in target
+      ? { commentId: target.id }
+      : this.renderedCommentTargets.get(target as vscode.Comment);
+    if (!messageTarget) {
+      return;
+    }
+
+    const comment = state.comments.find((candidate) => candidate.id === messageTarget.commentId);
+    const editable = messageTarget.replyId
+      ? comment?.replies?.find((reply) => reply.id === messageTarget.replyId && reply.author === 'reviewer')
+      : comment;
+    if (!editable) {
+      return;
+    }
+    const message = await vscode.window.showInputBox({
+      title: messageTarget.replyId ? 'Edit Review Follow-up' : 'Edit Review Comment',
+      prompt: comment?.status === 'resolved'
+        ? 'Edit the resolved comment without reopening it'
+        : 'Update your local review feedback',
+      value: editable.message,
+      ignoreFocusOut: true,
+      validateInput: (value) => value.trim() ? undefined : 'A review comment is required.',
+    });
+    if (message === undefined || message.trim() === editable.message) {
+      return;
+    }
+
+    state.comments = editReviewMessage(
+      state.comments,
+      messageTarget,
+      message,
+      new Date().toISOString(),
+    );
+    await this.save();
+    await this.renderCommentThreads();
+    this.tree.refresh();
+  }
+
   private async setCommentStatus(comment: ReviewComment | undefined, status: 'open' | 'resolved'): Promise<void> {
     if (!this.state || !comment?.id) {
       return;
@@ -481,6 +528,7 @@ class VirtualPrController implements vscode.Disposable {
       thread.dispose();
     }
     this.commentThreads.clear();
+    this.renderedCommentTargets = new WeakMap<vscode.Comment, ReviewMessageTarget>();
     if (!this.state) {
       return;
     }
@@ -495,17 +543,26 @@ class VirtualPrController implements vscode.Disposable {
           body: new vscode.MarkdownString(comment.message),
           mode: vscode.CommentMode.Preview,
           author: { name: 'Local reviewer' },
-          contextValue: `virtualPr.comment.${comment.status}`,
-          label: 'review',
+          contextValue: 'virtualPr.comment.editable',
+          label: comment.updatedAt ? 'review · edited' : 'review',
         };
-        const replies: vscode.Comment[] = (comment.replies || []).map((reply) => ({
-          body: new vscode.MarkdownString(reply.message),
-          mode: vscode.CommentMode.Preview,
-          author: { name: reply.author === 'codex' ? 'Codex' : 'Local reviewer' },
-          contextValue: `virtualPr.reply.${reply.author}`,
-          label: reply.author === 'codex' ? 'AI response' : 'follow-up',
-          timestamp: new Date(reply.createdAt),
-        }));
+        this.renderedCommentTargets.set(reviewComment, { commentId: comment.id });
+        const replies: vscode.Comment[] = (comment.replies || []).map((reply) => {
+          const rendered: vscode.Comment = {
+            body: new vscode.MarkdownString(reply.message),
+            mode: vscode.CommentMode.Preview,
+            author: { name: reply.author === 'codex' ? 'Codex' : 'Local reviewer' },
+            contextValue: `virtualPr.reply.${reply.author}`,
+            label: reply.author === 'codex'
+              ? 'AI response'
+              : reply.updatedAt ? 'follow-up · edited' : 'follow-up',
+            timestamp: new Date(reply.createdAt),
+          };
+          if (reply.author === 'reviewer') {
+            this.renderedCommentTargets.set(rendered, { commentId: comment.id, replyId: reply.id });
+          }
+          return rendered;
+        });
         const thread = this.comments.createCommentThread(document.uri, range, [reviewComment, ...replies]);
         if (comment.status === 'outdated') {
           thread.range = undefined;

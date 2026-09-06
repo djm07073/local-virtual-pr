@@ -18,6 +18,7 @@ export interface ReviewReply {
   author: 'reviewer' | 'codex';
   message: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface ReviewComment {
@@ -31,6 +32,12 @@ export interface ReviewComment {
   message: string;
   status: ReviewCommentStatus;
   replies?: ReviewReply[];
+  updatedAt?: string;
+}
+
+export interface ReviewMessageTarget {
+  commentId: string;
+  replyId?: string;
 }
 
 export interface RelocatedAnchor {
@@ -101,6 +108,46 @@ export function retainChangedViewedFiles(
   return [...new Set(viewedFiles)]
     .filter((file) => changed.has(file))
     .sort((left, right) => left.localeCompare(right));
+}
+
+export function editReviewMessage(
+  comments: readonly ReviewComment[],
+  target: ReviewMessageTarget,
+  message: string,
+  updatedAt: string,
+): ReviewComment[] {
+  const normalized = message.trim();
+  if (!normalized) {
+    throw new Error('A review comment cannot be empty.');
+  }
+
+  let found = false;
+  const updated = comments.map((comment) => {
+    if (comment.id !== target.commentId) {
+      return comment;
+    }
+    if (!target.replyId) {
+      found = true;
+      return { ...comment, message: normalized, updatedAt };
+    }
+
+    const replies = (comment.replies || []).map((reply) => {
+      if (reply.id !== target.replyId) {
+        return reply;
+      }
+      if (reply.author !== 'reviewer') {
+        throw new Error('Codex replies cannot be edited.');
+      }
+      found = true;
+      return { ...reply, message: normalized, updatedAt };
+    });
+    return { ...comment, replies };
+  });
+
+  if (!found) {
+    throw new Error('Unknown review comment or reply.');
+  }
+  return updated;
 }
 
 export function parseNameStatusZ(output: string): FileChange[] {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Edit original review comments, including comments in resolved threads.
+- Edit reviewer-authored follow-up replies while keeping Codex replies immutable.
+- Preserve the thread status and conversation when a comment is edited.
+
 ## 0.4.1
 
 - Fix Codex App Server startup by keeping workspace parameters on the stable API surface.
