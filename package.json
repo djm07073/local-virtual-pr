@@ -2,7 +2,7 @@
   "name": "local-virtual-pr",
   "displayName": "Local Virtual PR",
   "description": "Review local AI changes like a pull request while keeping VS Code symbol navigation available.",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "publisher": "local",
   "license": "MIT",
   "repository": {
@@ -231,6 +231,23 @@
           "command": "virtualPr.replyToComment",
           "when": "commentController == localVirtualPr && commentThread == virtualPr.comment.outdated",
           "group": "inline"
+        }
+      ],
+      "comments/commentThread/title": [
+        {
+          "command": "virtualPr.resolveComment",
+          "when": "commentController == localVirtualPr && commentThread == virtualPr.comment.open",
+          "group": "navigation@1"
+        },
+        {
+          "command": "virtualPr.resolveComment",
+          "when": "commentController == localVirtualPr && commentThread == virtualPr.comment.outdated",
+          "group": "navigation@1"
+        },
+        {
+          "command": "virtualPr.reopenComment",
+          "when": "commentController == localVirtualPr && commentThread == virtualPr.comment.resolved",
+          "group": "navigation@1"
         }
       ],
       "comments/comment/title": [

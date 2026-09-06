@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+
+- Fix Resolve and Reopen actions for editor comment threads.
+- Add thread-title actions that map native VS Code comment threads back to stored review comments.
+
 ## 0.5.0
 
 - Edit original review comments, including comments in resolved threads.

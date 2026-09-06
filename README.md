@@ -41,7 +41,7 @@ VS Code에서 로컬 AI 변경사항을 Pull Request처럼 검토하는 비공�
 ### 터미널에서 설치
 
 ```sh
-code --install-extension ./local-virtual-pr-0.5.0.vsix
+code --install-extension ./local-virtual-pr-0.5.1.vsix
 ```
 
 제거하려면:
@@ -109,6 +109,7 @@ Codex는 댓글을 자동으로 Resolve하지 않습니다.
 ### 6. 리뷰 완료하기
 
 - 만족한 댓글은 Virtual PR 트리에서 **Resolve Comment**로 직접 Resolve합니다.
+- 코드 댓글 스레드 우측의 체크 버튼으로도 Resolve할 수 있으며, Resolve된 스레드는 다시 열기 버튼으로 Reopen할 수 있습니다.
 - 모든 검토가 끝나면 **Virtual PR: Approve Locally**를 실행합니다.
 
 로컬 승인은 메타데이터일 뿐이며 커밋, push 또는 원격 PR 작업을 수행하지 않습니다.
@@ -142,7 +143,7 @@ npx vsce package --no-dependencies
 생성된 VSIX는 다음 명령으로 설치할 수 있습니다.
 
 ```sh
-code --install-extension ./local-virtual-pr-0.5.0.vsix --force
+code --install-extension ./local-virtual-pr-0.5.1.vsix --force
 ```
 
 ## 제한사항

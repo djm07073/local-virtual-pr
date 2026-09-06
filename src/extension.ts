@@ -102,8 +102,8 @@ class VirtualPrController implements vscode.Disposable {
       vscode.commands.registerCommand('virtualPr.unmarkViewed', (change: FileChange) => this.setViewed(change, false)),
       vscode.commands.registerCommand('virtualPr.addComment', (reply?: vscode.CommentReply) => this.addComment(reply)),
       vscode.commands.registerCommand('virtualPr.editComment', (target?: ReviewComment | vscode.Comment) => this.editComment(target)),
-      vscode.commands.registerCommand('virtualPr.resolveComment', (comment: ReviewComment) => this.setCommentStatus(comment, 'resolved')),
-      vscode.commands.registerCommand('virtualPr.reopenComment', (comment: ReviewComment) => this.setCommentStatus(comment, 'open')),
+      vscode.commands.registerCommand('virtualPr.resolveComment', (target: ReviewComment | vscode.CommentThread) => this.setCommentStatus(target, 'resolved')),
+      vscode.commands.registerCommand('virtualPr.reopenComment', (target: ReviewComment | vscode.CommentThread) => this.setCommentStatus(target, 'open')),
       vscode.commands.registerCommand('virtualPr.askAI', () => this.askAI()),
       vscode.commands.registerCommand('virtualPr.sendReview', () => this.sendReview()),
       vscode.commands.registerCommand('virtualPr.replyToComment', (reply: vscode.CommentReply) => this.sendReview(reply)),
@@ -345,11 +345,20 @@ class VirtualPrController implements vscode.Disposable {
     this.tree.refresh();
   }
 
-  private async setCommentStatus(comment: ReviewComment | undefined, status: 'open' | 'resolved'): Promise<void> {
-    if (!this.state || !comment?.id) {
+  private async setCommentStatus(
+    target: ReviewComment | vscode.CommentThread | undefined,
+    status: 'open' | 'resolved',
+  ): Promise<void> {
+    if (!this.state || !target) {
       return;
     }
-    const stored = this.state.comments.find((candidate) => candidate.id === comment.id);
+    const commentId = 'id' in target
+      ? target.id
+      : [...this.commentThreads].find(([, thread]) => thread === target)?.[0];
+    if (!commentId) {
+      return;
+    }
+    const stored = this.state.comments.find((candidate) => candidate.id === commentId);
     if (!stored) {
       return;
     }
