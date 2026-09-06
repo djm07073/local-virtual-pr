@@ -117,7 +117,7 @@ export class CodexAppServer {
     const server = new CodexAppServer(binary, cwd, output);
     try {
       await server.request('initialize', {
-        clientInfo: { name: 'local-virtual-pr', title: 'Local Virtual PR', version: '0.5.1' },
+        clientInfo: { name: 'local-virtual-pr', title: 'Local Virtual PR', version: '0.5.2' },
         capabilities: { experimentalApi: false, requestAttestation: false },
       });
       server.notify('initialized');

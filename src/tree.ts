@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { FileChange, ReviewComment, VirtualPrState } from './core';
 
-type TreeNode =
+export type TreeNode =
   | { type: 'create' }
   | { type: 'summary'; state: VirtualPrState }
   | { type: 'group'; group: 'changes' | 'comments'; count: number; viewedCount?: number }
@@ -53,13 +53,17 @@ export class ReviewTreeProvider implements vscode.TreeDataProvider<TreeNode> {
         ? `${node.change.previousPath} → ${node.change.path}`
         : node.change.path;
       item.tooltip = node.viewed ? `Viewed\n${location}` : location;
-      item.iconPath = new vscode.ThemeIcon(node.viewed
-        ? 'check'
-        : node.change.kind === 'D'
-          ? 'diff-removed'
-          : node.change.kind === 'A'
-            ? 'diff-added'
-            : 'diff-modified');
+      item.iconPath = new vscode.ThemeIcon(node.change.kind === 'D'
+        ? 'diff-removed'
+        : node.change.kind === 'A'
+          ? 'diff-added'
+          : 'diff-modified');
+      item.checkboxState = {
+        state: node.viewed
+          ? vscode.TreeItemCheckboxState.Checked
+          : vscode.TreeItemCheckboxState.Unchecked,
+        tooltip: node.viewed ? 'Mark file as unviewed' : 'Mark file as viewed',
+      };
       item.command = { command: 'virtualPr.openDiff', title: 'Open Diff', arguments: [node.change] };
       item.contextValue = `virtualPr.change.${node.viewed ? 'viewed' : 'unviewed'}`;
       return item;

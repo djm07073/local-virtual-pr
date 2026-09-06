@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.2
+
+- Add native checkboxes for marking changed files as Viewed.
+- Fix tree-item command routing for Viewed, comment editing, source opening, Resolve, and Reopen actions.
+
 ## 0.5.1
 
 - Fix Resolve and Reopen actions for editor comment threads.

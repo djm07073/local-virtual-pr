@@ -2,7 +2,7 @@
   "name": "local-virtual-pr",
   "displayName": "Local Virtual PR",
   "description": "Review local AI changes like a pull request while keeping VS Code symbol navigation available.",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "publisher": "local",
   "license": "MIT",
   "repository": {

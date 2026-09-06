@@ -18,7 +18,7 @@ import {
 } from './core';
 import { CodexAppServer, discoverCodexPath } from './codex';
 import { GitWorkspace } from './gitWorkspace';
-import { ReviewTreeProvider } from './tree';
+import { ReviewTreeProvider, TreeNode } from './tree';
 
 const STATE_KEY = 'localVirtualPr.state.v1';
 
@@ -43,6 +43,7 @@ class VirtualPrController implements vscode.Disposable {
   private changes: FileChange[] = [];
   private readonly git: GitWorkspace;
   private readonly tree: ReviewTreeProvider;
+  private readonly treeView: vscode.TreeView<TreeNode>;
   private readonly output = vscode.window.createOutputChannel('Local Virtual PR');
   private readonly comments = vscode.comments.createCommentController('localVirtualPr', 'Local Virtual PR');
   private readonly commentThreads = new Map<string, vscode.CommentThread>();
@@ -90,20 +91,22 @@ class VirtualPrController implements vscode.Disposable {
       this.state = stored;
     }
     this.tree = new ReviewTreeProvider(() => this.state, () => this.changes);
+    this.treeView = vscode.window.createTreeView('virtualPr.review', { treeDataProvider: this.tree });
     this.subscriptions.push(
-      vscode.window.registerTreeDataProvider('virtualPr.review', this.tree),
+      this.treeView,
+      this.treeView.onDidChangeCheckboxState((event) => void this.setViewedFromCheckboxes(event)),
       vscode.workspace.registerTextDocumentContentProvider('virtual-pr-base', new BaseDocumentProvider(this.git)),
       vscode.workspace.registerTextDocumentContentProvider('virtual-pr-empty', new EmptyDocumentProvider()),
       vscode.commands.registerCommand('virtualPr.create', () => this.create()),
       vscode.commands.registerCommand('virtualPr.refresh', () => this.refresh(true)),
       vscode.commands.registerCommand('virtualPr.openDiff', (change: FileChange) => this.openDiff(change)),
-      vscode.commands.registerCommand('virtualPr.openSource', (target: FileChange | ReviewComment) => this.openSource(target)),
-      vscode.commands.registerCommand('virtualPr.markViewed', (change: FileChange) => this.setViewed(change, true)),
-      vscode.commands.registerCommand('virtualPr.unmarkViewed', (change: FileChange) => this.setViewed(change, false)),
+      vscode.commands.registerCommand('virtualPr.openSource', (target: FileChange | ReviewComment | TreeNode) => this.openSource(target)),
+      vscode.commands.registerCommand('virtualPr.markViewed', (target: FileChange | TreeNode) => this.setViewed(target, true)),
+      vscode.commands.registerCommand('virtualPr.unmarkViewed', (target: FileChange | TreeNode) => this.setViewed(target, false)),
       vscode.commands.registerCommand('virtualPr.addComment', (reply?: vscode.CommentReply) => this.addComment(reply)),
-      vscode.commands.registerCommand('virtualPr.editComment', (target?: ReviewComment | vscode.Comment) => this.editComment(target)),
-      vscode.commands.registerCommand('virtualPr.resolveComment', (target: ReviewComment | vscode.CommentThread) => this.setCommentStatus(target, 'resolved')),
-      vscode.commands.registerCommand('virtualPr.reopenComment', (target: ReviewComment | vscode.CommentThread) => this.setCommentStatus(target, 'open')),
+      vscode.commands.registerCommand('virtualPr.editComment', (target?: ReviewComment | vscode.Comment | TreeNode) => this.editComment(target)),
+      vscode.commands.registerCommand('virtualPr.resolveComment', (target: ReviewComment | vscode.CommentThread | TreeNode) => this.setCommentStatus(target, 'resolved')),
+      vscode.commands.registerCommand('virtualPr.reopenComment', (target: ReviewComment | vscode.CommentThread | TreeNode) => this.setCommentStatus(target, 'open')),
       vscode.commands.registerCommand('virtualPr.askAI', () => this.askAI()),
       vscode.commands.registerCommand('virtualPr.sendReview', () => this.sendReview()),
       vscode.commands.registerCommand('virtualPr.replyToComment', (reply: vscode.CommentReply) => this.sendReview(reply)),
@@ -216,13 +219,23 @@ class VirtualPrController implements vscode.Disposable {
     );
   }
 
-  private async openSource(target: FileChange | ReviewComment): Promise<void> {
-    const file = 'path' in target ? target.path : target.file;
+  private async openSource(target: FileChange | ReviewComment | TreeNode): Promise<void> {
+    const source = 'type' in target
+      ? target.type === 'change'
+        ? target.change
+        : target.type === 'comment'
+          ? target.comment
+          : undefined
+      : target;
+    if (!source) {
+      return;
+    }
+    const file = 'path' in source ? source.path : source.file;
     const uri = this.workspaceUri(file);
     try {
       const document = await vscode.workspace.openTextDocument(uri);
       const editor = await vscode.window.showTextDocument(document, { preview: false });
-      const line = 'startLine' in target ? Math.max(0, target.startLine - 1) : 0;
+      const line = 'startLine' in source ? Math.max(0, source.startLine - 1) : 0;
       const position = new vscode.Position(Math.min(line, Math.max(0, document.lineCount - 1)), 0);
       editor.selection = new vscode.Selection(position, position);
       editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
@@ -232,12 +245,35 @@ class VirtualPrController implements vscode.Disposable {
     }
   }
 
-  private async setViewed(change: FileChange | undefined, viewed: boolean): Promise<void> {
+  private async setViewed(target: FileChange | TreeNode | undefined, viewed: boolean): Promise<void> {
     const state = this.requireState();
+    const change = target && 'type' in target
+      ? target.type === 'change' ? target.change : undefined
+      : target;
     if (!state || !change?.path || !this.changes.some((candidate) => candidate.path === change.path)) {
       return;
     }
     state.viewedFiles = setFileViewed(state.viewedFiles || [], change.path, viewed);
+    await this.save();
+    this.tree.refresh();
+  }
+
+  private async setViewedFromCheckboxes(event: vscode.TreeCheckboxChangeEvent<TreeNode>): Promise<void> {
+    const state = this.requireState();
+    if (!state) {
+      return;
+    }
+    let viewedFiles = state.viewedFiles || [];
+    for (const [node, checkboxState] of event.items) {
+      if (node.type === 'change') {
+        viewedFiles = setFileViewed(
+          viewedFiles,
+          node.change.path,
+          checkboxState === vscode.TreeItemCheckboxState.Checked,
+        );
+      }
+    }
+    state.viewedFiles = viewedFiles;
     await this.save();
     this.tree.refresh();
   }
@@ -302,14 +338,20 @@ class VirtualPrController implements vscode.Disposable {
     this.tree.refresh();
   }
 
-  private async editComment(target: ReviewComment | vscode.Comment | undefined): Promise<void> {
+  private async editComment(target: ReviewComment | vscode.Comment | TreeNode | undefined): Promise<void> {
     const state = this.requireState();
     if (!state || !target) {
       return;
     }
-    const messageTarget: ReviewMessageTarget | undefined = 'id' in target && 'file' in target
-      ? { commentId: target.id }
-      : this.renderedCommentTargets.get(target as vscode.Comment);
+    const editableTarget = 'type' in target
+      ? target.type === 'comment' ? target.comment : undefined
+      : target;
+    if (!editableTarget) {
+      return;
+    }
+    const messageTarget: ReviewMessageTarget | undefined = 'id' in editableTarget && 'file' in editableTarget
+      ? { commentId: editableTarget.id }
+      : this.renderedCommentTargets.get(editableTarget as vscode.Comment);
     if (!messageTarget) {
       return;
     }
@@ -346,15 +388,17 @@ class VirtualPrController implements vscode.Disposable {
   }
 
   private async setCommentStatus(
-    target: ReviewComment | vscode.CommentThread | undefined,
+    target: ReviewComment | vscode.CommentThread | TreeNode | undefined,
     status: 'open' | 'resolved',
   ): Promise<void> {
     if (!this.state || !target) {
       return;
     }
-    const commentId = 'id' in target
-      ? target.id
-      : [...this.commentThreads].find(([, thread]) => thread === target)?.[0];
+    const commentId = 'type' in target
+      ? target.type === 'comment' ? target.comment.id : undefined
+      : 'id' in target
+        ? target.id
+        : [...this.commentThreads].find(([, thread]) => thread === target)?.[0];
     if (!commentId) {
       return;
     }
