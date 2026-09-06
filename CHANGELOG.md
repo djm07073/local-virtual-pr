@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Fix Codex App Server startup by keeping workspace parameters on the stable API surface.
+
 ## 0.4.0
 
 - Mark changed files as Viewed or Unviewed from the review tree.

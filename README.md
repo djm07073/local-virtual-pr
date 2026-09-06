@@ -40,7 +40,7 @@ VS Code에서 로컬 AI 변경사항을 Pull Request처럼 검토하는 비공�
 ### 터미널에서 설치
 
 ```sh
-code --install-extension ./local-virtual-pr-0.4.0.vsix
+code --install-extension ./local-virtual-pr-0.4.1.vsix
 ```
 
 제거하려면:
@@ -139,7 +139,7 @@ npx vsce package --no-dependencies
 생성된 VSIX는 다음 명령으로 설치할 수 있습니다.
 
 ```sh
-code --install-extension ./local-virtual-pr-0.4.0.vsix --force
+code --install-extension ./local-virtual-pr-0.4.1.vsix --force
 ```
 
 ## 제한사항

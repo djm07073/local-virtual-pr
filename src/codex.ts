@@ -117,7 +117,7 @@ export class CodexAppServer {
     const server = new CodexAppServer(binary, cwd, output);
     try {
       await server.request('initialize', {
-        clientInfo: { name: 'local-virtual-pr', title: 'Local Virtual PR', version: '0.2.0' },
+        clientInfo: { name: 'local-virtual-pr', title: 'Local Virtual PR', version: '0.4.1' },
         capabilities: { experimentalApi: false, requestAttestation: false },
       });
       server.notify('initialized');
@@ -126,7 +126,6 @@ export class CodexAppServer {
         threadId,
         input: [{ type: 'text', text: prompt, text_elements: [] }],
         cwd,
-        runtimeWorkspaceRoots: [cwd],
         approvalPolicy,
         ...(outputSchema ? { outputSchema } : {}),
       }) as { turn: { id: string } };
@@ -146,7 +145,6 @@ export class CodexAppServer {
         const resumed = await this.request('thread/resume', {
           threadId: existingThreadId,
           cwd: this.cwd,
-          runtimeWorkspaceRoots: [this.cwd],
           approvalPolicy,
           sandbox: 'workspace-write',
           excludeTurns: true,
@@ -159,7 +157,6 @@ export class CodexAppServer {
 
     const started = await this.request('thread/start', {
       cwd: this.cwd,
-      runtimeWorkspaceRoots: [this.cwd],
       approvalPolicy,
       sandbox: 'workspace-write',
       serviceName: 'Local Virtual PR',
