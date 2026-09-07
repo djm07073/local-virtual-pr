@@ -118,6 +118,22 @@ export interface VirtualPrSession {
   changes: FileChange[];
 }
 
+export class LatestOperationGate {
+  private generation = 0;
+
+  begin(): number {
+    return ++this.generation;
+  }
+
+  isCurrent(generation: number): boolean {
+    return generation === this.generation;
+  }
+
+  invalidate(): void {
+    this.generation++;
+  }
+}
+
 export function resetVirtualPrSession(
   _state: VirtualPrState | undefined,
   _changes: readonly FileChange[],

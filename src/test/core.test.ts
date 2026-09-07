@@ -8,6 +8,7 @@ import {
   deleteReviewMessage,
   editReviewMessage,
   isAppServerHelp,
+  LatestOperationGate,
   markReviewerRepliesSent,
   parseHeadRanges,
   parseNameStatusZ,
@@ -21,6 +22,34 @@ import {
   ReviewComment,
   setFileViewed,
 } from '../core';
+
+test('latest render gate rejects stale async completions', async () => {
+  const gate = new LatestOperationGate();
+  const rendered: string[] = [];
+  let releaseFirst!: () => void;
+  let releaseSecond!: () => void;
+  const firstPause = new Promise<void>((resolve) => { releaseFirst = resolve; });
+  const secondPause = new Promise<void>((resolve) => { releaseSecond = resolve; });
+  const render = async (label: string, pause: Promise<void>): Promise<void> => {
+    const generation = gate.begin();
+    await pause;
+    if (gate.isCurrent(generation)) {
+      rendered.push(label);
+    }
+  };
+
+  const first = render('stale', firstPause);
+  const second = render('latest', secondPause);
+  releaseFirst();
+  await first;
+  releaseSecond();
+  await second;
+
+  assert.deepEqual(rendered, ['latest']);
+  const pending = gate.begin();
+  gate.invalidate();
+  assert.equal(gate.isCurrent(pending), false);
+});
 
 test('Virtual PR clearing transitions', async (t) => {
   const current = {

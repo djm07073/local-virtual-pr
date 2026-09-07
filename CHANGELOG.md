@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.1
+
+- Prevent overlapping asynchronous comment renders from creating duplicate editor threads.
+- Invalidate stale comment renders when a newer render starts or the extension is disposed.
+
 ## 0.9.0
 
 - Clear all current review comments and replies from the Review comments group or Command Palette.

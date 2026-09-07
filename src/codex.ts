@@ -167,7 +167,7 @@ export class CodexAppServer {
 
   private async initialize(): Promise<void> {
     await this.request('initialize', {
-      clientInfo: { name: 'local-virtual-pr', title: 'Local Virtual PR', version: '0.9.0' },
+      clientInfo: { name: 'local-virtual-pr', title: 'Local Virtual PR', version: '0.9.1' },
       capabilities: { experimentalApi: false, requestAttestation: false },
     });
     this.notify('initialized');

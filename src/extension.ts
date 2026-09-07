@@ -9,6 +9,7 @@ import {
   deleteReviewMessage,
   editReviewMessage,
   FileChange,
+  LatestOperationGate,
   markReviewerRepliesSent,
   parseReviewResponse,
   prioritizeCodexEfforts,
@@ -59,6 +60,7 @@ class VirtualPrController implements vscode.Disposable {
   private readonly output = vscode.window.createOutputChannel('Local Virtual PR');
   private readonly comments = vscode.comments.createCommentController('localVirtualPr', 'Local Virtual PR');
   private readonly commentThreads = new Map<string, vscode.CommentThread>();
+  private readonly commentRenderGate = new LatestOperationGate();
   private renderedCommentTargets = new WeakMap<vscode.Comment, ReviewMessageTarget>();
   private readonly commentingRangeProvider: vscode.CommentingRangeProvider = {
     provideCommentingRanges: async (document) => {
@@ -808,18 +810,26 @@ class VirtualPrController implements vscode.Disposable {
   }
 
   private async renderCommentThreads(): Promise<void> {
+    const generation = this.commentRenderGate.begin();
     for (const thread of this.commentThreads.values()) {
       thread.dispose();
     }
     this.commentThreads.clear();
     this.renderedCommentTargets = new WeakMap<vscode.Comment, ReviewMessageTarget>();
-    if (!this.state) {
+    const state = this.state;
+    if (!state) {
       return;
     }
 
-    for (const comment of this.state.comments) {
+    for (const comment of state.comments) {
+      if (!this.commentRenderGate.isCurrent(generation)) {
+        return;
+      }
       try {
         const document = await vscode.workspace.openTextDocument(this.workspaceUri(comment.file));
+        if (!this.commentRenderGate.isCurrent(generation)) {
+          return;
+        }
         const start = Math.min(Math.max(0, comment.startLine - 1), Math.max(0, document.lineCount - 1));
         const end = Math.min(Math.max(start, comment.endLine - 1), Math.max(0, document.lineCount - 1));
         const range = new vscode.Range(start, 0, end, document.lineAt(end).text.length);
@@ -853,7 +863,7 @@ class VirtualPrController implements vscode.Disposable {
         if (comment.status === 'outdated') {
           thread.range = undefined;
         }
-        thread.canReply = comment.status !== 'resolved' && this.state.status !== 'ai-working'
+        thread.canReply = comment.status !== 'resolved' && state.status !== 'ai-working'
           ? { name: 'Local reviewer' }
           : false;
         thread.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
@@ -864,6 +874,9 @@ class VirtualPrController implements vscode.Disposable {
           : vscode.CommentThreadState.Unresolved;
         this.commentThreads.set(comment.id, thread);
       } catch {
+        if (!this.commentRenderGate.isCurrent(generation)) {
+          return;
+        }
         continue;
       }
     }
@@ -917,6 +930,7 @@ class VirtualPrController implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.commentRenderGate.invalidate();
     for (const thread of this.commentThreads.values()) {
       thread.dispose();
     }
