@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0
+
+- Clear all current review comments and replies from the Review comments group or Command Palette.
+- Preserve the existing Codex task, model and effort selection, Viewed files, and Virtual PR base.
+- Prevent bulk comment clearing while Codex is working.
+
 ## 0.8.0
 
 - Add delete buttons to review comments in the review tree and editor comment UI.

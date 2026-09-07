@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import {
   appendReviewReply,
   buildReviewPrompt,
+  clearReviewComments,
   CodexModel,
   deleteReviewMessage,
   editReviewMessage,
@@ -118,6 +119,7 @@ class VirtualPrController implements vscode.Disposable {
       vscode.commands.registerCommand('virtualPr.addComment', (reply?: vscode.CommentReply) => this.addComment(reply)),
       vscode.commands.registerCommand('virtualPr.editComment', (target?: ReviewComment | vscode.Comment | TreeNode) => this.editComment(target)),
       vscode.commands.registerCommand('virtualPr.deleteComment', (target?: ReviewComment | vscode.Comment | vscode.CommentThread | TreeNode) => this.deleteComment(target)),
+      vscode.commands.registerCommand('virtualPr.clearComments', () => this.clearAllReviewComments()),
       vscode.commands.registerCommand('virtualPr.resolveComment', (target: ReviewComment | vscode.CommentThread | TreeNode) => this.setCommentStatus(target, 'resolved')),
       vscode.commands.registerCommand('virtualPr.reopenComment', (target: ReviewComment | vscode.CommentThread | TreeNode) => this.setCommentStatus(target, 'open')),
       vscode.commands.registerCommand('virtualPr.askAI', () => this.askAI()),
@@ -463,6 +465,39 @@ class VirtualPrController implements vscode.Disposable {
     await this.save();
     await this.renderCommentThreads();
     this.tree.refresh();
+  }
+
+  private async clearAllReviewComments(): Promise<void> {
+    const state = this.requireState();
+    if (!state) {
+      return;
+    }
+    if (state.status === 'ai-working') {
+      void vscode.window.showInformationMessage('Review comments cannot be cleared while Codex is working.');
+      return;
+    }
+    if (state.comments.length === 0) {
+      void vscode.window.showInformationMessage('There are no review comments to clear.');
+      return;
+    }
+
+    const count = state.comments.length;
+    const choice = await vscode.window.showWarningMessage(
+      `Delete all ${count} review comment thread(s) and their replies? The Codex task will be kept.`,
+      { modal: true },
+      'Delete all comments',
+    );
+    if (choice !== 'Delete all comments') {
+      return;
+    }
+
+    this.state = clearReviewComments(state);
+    await this.save();
+    await this.renderCommentThreads();
+    this.tree.refresh();
+    void vscode.window.showInformationMessage(
+      `Deleted ${count} review comment thread(s). The Codex task is still connected.`,
+    );
   }
 
   private reviewMessageTarget(

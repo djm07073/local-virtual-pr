@@ -125,6 +125,10 @@ export function resetVirtualPrSession(
   return { state: undefined, changes: [] };
 }
 
+export function clearReviewComments(state: VirtualPrState): VirtualPrState {
+  return { ...state, comments: [] };
+}
+
 export function normalizeCodexModels(response: unknown): CodexModel[] {
   if (!response || typeof response !== 'object') {
     return [];

@@ -4,6 +4,7 @@ import {
   appendReviewReply,
   buildCodexTurnParams,
   buildReviewPrompt,
+  clearReviewComments,
   deleteReviewMessage,
   editReviewMessage,
   isAppServerHelp,
@@ -21,7 +22,7 @@ import {
   setFileViewed,
 } from '../core';
 
-test('resetting a Virtual PR clears its review state and changed files', () => {
+test('Virtual PR clearing transitions', async (t) => {
   const current = {
     version: 1 as const,
     title: 'feature → main',
@@ -48,7 +49,26 @@ test('resetting a Virtual PR clears its review state and changed files', () => {
   };
   const changes = [{ kind: 'M' as const, path: 'src/file.ts' }];
 
-  assert.deepEqual(resetVirtualPrSession(current, changes), { state: undefined, changes: [] });
+  await t.test('reset clears the entire review state and changed files', () => {
+    assert.deepEqual(resetVirtualPrSession(current, changes), { state: undefined, changes: [] });
+  });
+  await t.test('clear comments preserves the Codex task and all other review state', () => {
+    assert.deepEqual(clearReviewComments(current), {
+      version: 1,
+      title: 'feature → main',
+      workspaceRoot: '/workspace',
+      baseRef: 'main',
+      baseCommit: 'abc123',
+      createdAt: '2026-09-07T00:00:00.000Z',
+      status: 'changes-requested',
+      codexThreadId: 'thread-1',
+      codexModel: 'gpt-selected',
+      codexEffort: 'high',
+      comments: [],
+      viewedFiles: ['src/file.ts'],
+    });
+    assert.equal(current.comments.length, 1);
+  });
 });
 
 test('Codex model list keeps selectable models and their supported efforts', () => {

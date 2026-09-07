@@ -46,6 +46,7 @@ export class ReviewTreeProvider implements vscode.TreeDataProvider<TreeNode> {
         : `${node.count}`;
       const item = new vscode.TreeItem(`${label} (${count})`, vscode.TreeItemCollapsibleState.Expanded);
       item.iconPath = new vscode.ThemeIcon(node.group === 'changes' ? 'files' : 'comment-discussion');
+      item.contextValue = `virtualPr.group.${node.group}`;
       return item;
     }
     if (node.type === 'change') {

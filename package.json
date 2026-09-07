@@ -2,7 +2,7 @@
   "name": "local-virtual-pr",
   "displayName": "Local Virtual PR",
   "description": "Review local AI changes like a pull request while keeping VS Code symbol navigation available.",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "publisher": "local",
   "license": "MIT",
   "repository": {
@@ -80,6 +80,11 @@
         "command": "virtualPr.deleteComment",
         "title": "Virtual PR: Delete Review Comment",
         "icon": "$(trash)"
+      },
+      {
+        "command": "virtualPr.clearComments",
+        "title": "Virtual PR: Clear All Review Comments",
+        "icon": "$(clear-all)"
       },
       {
         "command": "virtualPr.resolveComment",
@@ -173,6 +178,11 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "virtualPr.clearComments",
+          "when": "view == virtualPr.review && viewItem == virtualPr.group.comments",
+          "group": "inline@1"
+        },
         {
           "command": "virtualPr.openSource",
           "when": "view == virtualPr.review && viewItem == virtualPr.change.unviewed",
