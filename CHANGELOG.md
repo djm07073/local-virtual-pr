@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1
+
+- Add a dedicated Reset command that immediately clears the local Virtual PR state.
+- Remove review comments, Viewed files, model selection, and the Codex task link during Reset.
+- Rename the existing recreate flow to Create or Replace so cancellation safely keeps the current review.
+
 ## 0.7.0
 
 - Load the available model catalog and supported reasoning efforts from Codex App Server.

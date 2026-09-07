@@ -15,9 +15,40 @@ import {
   prioritizeCodexModels,
   retainChangedViewedFiles,
   relocateAnchor,
+  resetVirtualPrSession,
   ReviewComment,
   setFileViewed,
 } from '../core';
+
+test('resetting a Virtual PR clears its review state and changed files', () => {
+  const current = {
+    version: 1 as const,
+    title: 'feature → main',
+    workspaceRoot: '/workspace',
+    baseRef: 'main',
+    baseCommit: 'abc123',
+    createdAt: '2026-09-07T00:00:00.000Z',
+    status: 'changes-requested' as const,
+    codexThreadId: 'thread-1',
+    codexModel: 'gpt-selected',
+    codexEffort: 'high',
+    comments: [{
+      id: 'comment-1',
+      file: 'src/file.ts',
+      startLine: 1,
+      endLine: 1,
+      selectedCode: 'old();',
+      contextBefore: [],
+      contextAfter: [],
+      message: 'Replace this.',
+      status: 'open' as const,
+    }],
+    viewedFiles: ['src/file.ts'],
+  };
+  const changes = [{ kind: 'M' as const, path: 'src/file.ts' }];
+
+  assert.deepEqual(resetVirtualPrSession(current, changes), { state: undefined, changes: [] });
+});
 
 test('Codex model list keeps selectable models and their supported efforts', () => {
   assert.deepEqual(normalizeCodexModels({

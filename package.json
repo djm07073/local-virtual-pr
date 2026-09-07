@@ -2,7 +2,7 @@
   "name": "local-virtual-pr",
   "displayName": "Local Virtual PR",
   "description": "Review local AI changes like a pull request while keeping VS Code symbol navigation available.",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "publisher": "local",
   "license": "MIT",
   "repository": {
@@ -34,8 +34,13 @@
     "commands": [
       {
         "command": "virtualPr.create",
-        "title": "Virtual PR: Create or Reset",
+        "title": "Virtual PR: Create or Replace",
         "icon": "$(git-pull-request-create)"
+      },
+      {
+        "command": "virtualPr.reset",
+        "title": "Virtual PR: Reset",
+        "icon": "$(trash)"
       },
       {
         "command": "virtualPr.refresh",
@@ -132,29 +137,34 @@
           "group": "navigation@1"
         },
         {
-          "command": "virtualPr.refresh",
-          "when": "view == virtualPr.review",
+          "command": "virtualPr.reset",
+          "when": "view == virtualPr.review && virtualPr.hasState",
           "group": "navigation@2"
         },
         {
-          "command": "virtualPr.askAI",
+          "command": "virtualPr.refresh",
           "when": "view == virtualPr.review",
           "group": "navigation@3"
         },
         {
-          "command": "virtualPr.sendReview",
+          "command": "virtualPr.askAI",
           "when": "view == virtualPr.review",
           "group": "navigation@4"
         },
         {
-          "command": "virtualPr.approve",
+          "command": "virtualPr.sendReview",
           "when": "view == virtualPr.review",
           "group": "navigation@5"
         },
         {
-          "command": "virtualPr.showOutput",
+          "command": "virtualPr.approve",
           "when": "view == virtualPr.review",
           "group": "navigation@6"
+        },
+        {
+          "command": "virtualPr.showOutput",
+          "when": "view == virtualPr.review",
+          "group": "navigation@7"
         }
       ],
       "view/item/context": [

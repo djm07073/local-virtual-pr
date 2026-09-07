@@ -113,6 +113,18 @@ export interface VirtualPrState {
   viewedFiles?: string[];
 }
 
+export interface VirtualPrSession {
+  state: VirtualPrState | undefined;
+  changes: FileChange[];
+}
+
+export function resetVirtualPrSession(
+  _state: VirtualPrState | undefined,
+  _changes: readonly FileChange[],
+): VirtualPrSession {
+  return { state: undefined, changes: [] };
+}
+
 export function normalizeCodexModels(response: unknown): CodexModel[] {
   if (!response || typeof response !== 'object') {
     return [];

@@ -7,6 +7,7 @@ VS Code에서 로컬 AI 변경사항을 Pull Request처럼 검토하는 비공�
 ## 주요 기능
 
 - Git 기준 ref와 현재 working tree 사이의 Virtual PR 생성
+- 리뷰 상태와 Codex task 연결을 즉시 지우는 독립적인 Reset
 - 변경 파일 목록과 diff 제공
 - 파일별 Viewed 표시와 검토 진행률 제공
 - 실제 source editor에서 심볼 탐색 지원
@@ -42,7 +43,7 @@ VS Code에서 로컬 AI 변경사항을 Pull Request처럼 검토하는 비공�
 ### 터미널에서 설치
 
 ```sh
-code --install-extension ./local-virtual-pr-0.7.0.vsix
+code --install-extension ./local-virtual-pr-0.7.1.vsix
 ```
 
 제거하려면:
@@ -57,10 +58,12 @@ code --uninstall-extension local.local-virtual-pr
 
 1. Git 프로젝트를 VS Code로 엽니다.
 2. Activity Bar의 **Virtual PR** 아이콘을 엽니다.
-3. **Virtual PR: Create or Reset**을 실행합니다.
+3. **Virtual PR: Create or Replace**를 실행합니다.
 4. 비교 기준 ref를 선택합니다. 비어 있으면 `origin/main`, `main`, `origin/master` 등을 순서대로 탐색합니다.
 
-Virtual PR을 다시 생성하면 기존 로컬 리뷰 댓글과 연결된 Codex 세션 ID가 초기화됩니다.
+Virtual PR을 새 base로 교체하면 기존 로컬 리뷰 댓글과 연결된 Codex 세션 ID가 초기화됩니다.
+
+현재 Virtual PR을 완전히 비우려면 상단 휴지통 버튼이나 Command Palette의 **Virtual PR: Reset**을 실행합니다. 확인 즉시 로컬 댓글, Viewed 상태, 선택한 모델과 effort, Codex task 연결이 삭제되고 최초 생성 화면으로 돌아갑니다. 새 base ref를 다시 입력할 필요는 없습니다.
 
 ### 2. 변경사항 검토하기
 
@@ -152,7 +155,7 @@ npx vsce package --no-dependencies
 생성된 VSIX는 다음 명령으로 설치할 수 있습니다.
 
 ```sh
-code --install-extension ./local-virtual-pr-0.7.0.vsix --force
+code --install-extension ./local-virtual-pr-0.7.1.vsix --force
 ```
 
 ## 제한사항

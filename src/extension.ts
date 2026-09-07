@@ -13,6 +13,7 @@ import {
   prioritizeCodexModels,
   retainChangedViewedFiles,
   relocateAnchor,
+  resetVirtualPrSession,
   REVIEW_OUTPUT_SCHEMA,
   ReviewComment,
   ReviewMessageTarget,
@@ -107,6 +108,7 @@ class VirtualPrController implements vscode.Disposable {
       vscode.workspace.registerTextDocumentContentProvider('virtual-pr-base', new BaseDocumentProvider(this.git)),
       vscode.workspace.registerTextDocumentContentProvider('virtual-pr-empty', new EmptyDocumentProvider()),
       vscode.commands.registerCommand('virtualPr.create', () => this.create()),
+      vscode.commands.registerCommand('virtualPr.reset', () => this.reset()),
       vscode.commands.registerCommand('virtualPr.refresh', () => this.refresh(true)),
       vscode.commands.registerCommand('virtualPr.openDiff', (change: FileChange) => this.openDiff(change)),
       vscode.commands.registerCommand('virtualPr.openSource', (target: FileChange | ReviewComment | TreeNode) => this.openSource(target)),
@@ -135,16 +137,17 @@ class VirtualPrController implements vscode.Disposable {
     if (this.state) {
       await this.refresh(false);
     }
+    await this.setHasStateContext();
   }
 
   private async create(): Promise<void> {
     if (this.state) {
       const choice = await vscode.window.showWarningMessage(
-        'Reset the current Virtual PR and remove its local review comments?',
+        'Replace the current Virtual PR and remove its local review comments?',
         { modal: true },
-        'Reset',
+        'Replace',
       );
-      if (choice !== 'Reset') {
+      if (choice !== 'Replace') {
         return;
       }
     }
@@ -176,8 +179,40 @@ class VirtualPrController implements vscode.Disposable {
       viewedFiles: [],
     };
     await this.save();
+    await this.setHasStateContext();
     await this.refresh(false);
     void vscode.window.showInformationMessage(`Virtual PR created against ${baseRef.trim()}.`);
+  }
+
+  private async reset(): Promise<void> {
+    if (!this.state) {
+      void vscode.window.showInformationMessage('There is no Virtual PR to reset.');
+      return;
+    }
+    const warning = this.state.status === 'ai-working'
+      ? 'Reset the current Virtual PR? Codex is still running and may continue editing the workspace.'
+      : 'Reset the current Virtual PR and remove its local review comments, Viewed state, and Codex task link?';
+    const choice = await vscode.window.showWarningMessage(warning, { modal: true }, 'Reset');
+    if (choice !== 'Reset') {
+      return;
+    }
+
+    const reset = resetVirtualPrSession(this.state, this.changes);
+    this.state = reset.state;
+    this.changes = reset.changes;
+    await this.save();
+    await this.setHasStateContext();
+    this.comments.commentingRangeProvider = undefined;
+    await this.renderCommentThreads();
+    this.tree.refresh();
+    if (vscode.window.activeTextEditor) {
+      vscode.window.activeTextEditor.setDecorations(this.changedLines, []);
+    }
+    void vscode.window.showInformationMessage('Virtual PR reset. Local comments and the Codex task link were removed.');
+  }
+
+  private setHasStateContext(): Thenable<unknown> {
+    return vscode.commands.executeCommand('setContext', 'virtualPr.hasState', Boolean(this.state));
   }
 
   private async refresh(notify: boolean): Promise<void> {
