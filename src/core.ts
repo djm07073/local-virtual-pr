@@ -51,6 +51,30 @@ export interface CodexReviewResponse {
   comments: Array<{ commentId: string; reply: string }>;
 }
 
+export interface CodexReasoningEffort {
+  reasoningEffort: string;
+  description?: string;
+}
+
+export interface CodexModel {
+  id: string;
+  model: string;
+  displayName: string;
+  defaultReasoningEffort?: string;
+  supportedReasoningEfforts: CodexReasoningEffort[];
+  isDefault: boolean;
+}
+
+export interface CodexTurnOptions {
+  threadId: string;
+  prompt: string;
+  cwd: string;
+  approvalPolicy: string;
+  outputSchema?: Record<string, unknown>;
+  model?: string;
+  effort?: string;
+}
+
 export const REVIEW_OUTPUT_SCHEMA: Record<string, unknown> = {
   type: 'object',
   properties: {
@@ -83,8 +107,110 @@ export interface VirtualPrState {
   createdAt: string;
   status: VirtualPrStatus;
   codexThreadId?: string;
+  codexModel?: string;
+  codexEffort?: string;
   comments: ReviewComment[];
   viewedFiles?: string[];
+}
+
+export function normalizeCodexModels(response: unknown): CodexModel[] {
+  if (!response || typeof response !== 'object') {
+    return [];
+  }
+  const data = (response as Record<string, unknown>).data;
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  const models: CodexModel[] = [];
+  for (const candidate of data) {
+    if (!candidate || typeof candidate !== 'object') {
+      continue;
+    }
+    const value = candidate as Record<string, unknown>;
+    const id = typeof value.id === 'string' ? value.id.trim() : '';
+    const model = typeof value.model === 'string' ? value.model.trim() : '';
+    if (!id || !model || value.hidden === true) {
+      continue;
+    }
+    const efforts = Array.isArray(value.supportedReasoningEfforts)
+      ? value.supportedReasoningEfforts.flatMap((effort): CodexReasoningEffort[] => {
+        if (!effort || typeof effort !== 'object') {
+          return [];
+        }
+        const row = effort as Record<string, unknown>;
+        const reasoningEffort = typeof row.reasoningEffort === 'string' ? row.reasoningEffort.trim() : '';
+        if (!reasoningEffort) {
+          return [];
+        }
+        return [{
+          reasoningEffort,
+          ...(typeof row.description === 'string' && row.description.trim()
+            ? { description: row.description.trim() }
+            : {}),
+        }];
+      })
+      : [];
+    models.push({
+      id,
+      model,
+      displayName: typeof value.displayName === 'string' && value.displayName.trim()
+        ? value.displayName.trim()
+        : model,
+      ...(typeof value.defaultReasoningEffort === 'string' && value.defaultReasoningEffort.trim()
+        ? { defaultReasoningEffort: value.defaultReasoningEffort.trim() }
+        : {}),
+      supportedReasoningEfforts: efforts,
+      isDefault: value.isDefault === true,
+    });
+  }
+  return models;
+}
+
+export function prioritizeCodexModels(
+  models: readonly CodexModel[],
+  preferredModel?: string,
+): CodexModel[] {
+  return prioritizeChoices(
+    models,
+    (model) => model.model === preferredModel,
+    (model) => model.isDefault,
+  );
+}
+
+export function prioritizeCodexEfforts(
+  efforts: readonly CodexReasoningEffort[],
+  preferredEffort?: string,
+  defaultEffort?: string,
+): CodexReasoningEffort[] {
+  return prioritizeChoices(
+    efforts,
+    (effort) => effort.reasoningEffort === preferredEffort,
+    (effort) => effort.reasoningEffort === defaultEffort,
+  );
+}
+
+function prioritizeChoices<T>(
+  choices: readonly T[],
+  isPreferred: (choice: T) => boolean,
+  isDefault: (choice: T) => boolean,
+): T[] {
+  return [...choices].sort((left, right) => {
+    const priority = (choice: T): number => isPreferred(choice) ? 0 : isDefault(choice) ? 1 : 2;
+    return priority(left) - priority(right);
+  });
+}
+
+export function buildCodexTurnParams(options: CodexTurnOptions): Record<string, unknown> {
+  return {
+    threadId: options.threadId,
+    input: [{ type: 'text', text: options.prompt, text_elements: [] }],
+    cwd: options.cwd,
+    approvalPolicy: options.approvalPolicy,
+    ...(options.outputSchema ? { outputSchema: options.outputSchema } : {}),
+    ...(options.model ? { model: options.model } : {}),
+    ...(options.effort ? { effort: options.effort } : {}),
+  };
 }
 
 export function setFileViewed(

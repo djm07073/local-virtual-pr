@@ -32,7 +32,10 @@ export class ReviewTreeProvider implements vscode.TreeDataProvider<TreeNode> {
     if (node.type === 'summary') {
       const item = new vscode.TreeItem(node.state.title);
       item.description = `${node.state.status} · ${node.state.baseRef}`;
-      item.tooltip = `Base ${node.state.baseCommit}`;
+      const codexSelection = node.state.codexModel
+        ? `\nCodex: ${node.state.codexModel}${node.state.codexEffort ? ` / ${node.state.codexEffort}` : ''}`
+        : '';
+      item.tooltip = `Base ${node.state.baseCommit}${codexSelection}`;
       item.iconPath = new vscode.ThemeIcon(node.state.status === 'approved' ? 'pass-filled' : 'git-pull-request');
       return item;
     }

@@ -4,10 +4,13 @@ import * as vscode from 'vscode';
 import {
   appendReviewReply,
   buildReviewPrompt,
+  CodexModel,
   editReviewMessage,
   FileChange,
   markReviewerRepliesSent,
   parseReviewResponse,
+  prioritizeCodexEfforts,
+  prioritizeCodexModels,
   retainChangedViewedFiles,
   relocateAnchor,
   REVIEW_OUTPUT_SCHEMA,
@@ -21,6 +24,12 @@ import { GitWorkspace } from './gitWorkspace';
 import { ReviewTreeProvider, TreeNode } from './tree';
 
 const STATE_KEY = 'localVirtualPr.state.v1';
+
+interface SelectedCodexSettings {
+  binary: string;
+  model: string;
+  effort?: string;
+}
 
 class BaseDocumentProvider implements vscode.TextDocumentContentProvider {
   constructor(private readonly git: GitWorkspace) {}
@@ -472,10 +481,97 @@ class VirtualPrController implements vscode.Disposable {
       void vscode.window.showInformationMessage('There are no unresolved review comments.');
       return;
     }
-    await this.runAgent(buildReviewPrompt(state.comments), unresolved.map((comment) => comment.id));
+    let selection: SelectedCodexSettings | undefined;
+    try {
+      selection = await this.selectCodexSettings(state);
+    } catch (error) {
+      this.output.appendLine(`\n[Virtual PR] Could not load Codex models: ${String(error)}\n`);
+      this.output.show(true);
+      void vscode.window.showErrorMessage(`Could not load Codex models: ${String(error)}`);
+      return;
+    }
+    if (!selection) {
+      return;
+    }
+    await this.runAgent(
+      buildReviewPrompt(state.comments),
+      unresolved.map((comment) => comment.id),
+      selection,
+    );
   }
 
-  private async runAgent(prompt: string, reviewCommentIds: readonly string[] = []): Promise<void> {
+  private async selectCodexSettings(state: VirtualPrState): Promise<SelectedCodexSettings | undefined> {
+    const binary = await discoverCodexPath();
+    const models = await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: 'Virtual PR: Loading Codex models' },
+      () => CodexAppServer.listModels(binary, this.root, this.output),
+    );
+    const selectedModel = await vscode.window.showQuickPick(
+      prioritizeCodexModels(models, state.codexModel).map((model) => ({
+        label: model.displayName,
+        description: [model.model, model.isDefault ? 'Codex default' : ''].filter(Boolean).join(' · '),
+        detail: this.modelEffortDetail(model),
+        model,
+      })),
+      {
+        title: 'Send Review to AI · Select model',
+        placeHolder: state.codexModel
+          ? `Previous selection: ${state.codexModel}`
+          : 'Choose the model for this review',
+        ignoreFocusOut: true,
+      },
+    );
+    if (!selectedModel) {
+      return undefined;
+    }
+
+    const efforts = prioritizeCodexEfforts(
+      selectedModel.model.supportedReasoningEfforts,
+      state.codexModel === selectedModel.model.model ? state.codexEffort : undefined,
+      selectedModel.model.defaultReasoningEffort,
+    );
+    let effort: string | undefined;
+    if (efforts.length > 0) {
+      const selectedEffort = await vscode.window.showQuickPick(
+        efforts.map((option) => ({
+          label: option.reasoningEffort,
+          description: option.reasoningEffort === selectedModel.model.defaultReasoningEffort
+            ? 'Model default'
+            : undefined,
+          detail: option.description,
+          effort: option.reasoningEffort,
+        })),
+        {
+          title: `Send Review to AI · ${selectedModel.model.displayName} · Select effort`,
+          placeHolder: 'Choose the reasoning effort for this review',
+          ignoreFocusOut: true,
+        },
+      );
+      if (!selectedEffort) {
+        return undefined;
+      }
+      effort = selectedEffort.effort;
+    }
+
+    state.codexModel = selectedModel.model.model;
+    state.codexEffort = effort;
+    await this.save();
+    this.tree.refresh();
+    return { binary, model: selectedModel.model.model, effort };
+  }
+
+  private modelEffortDetail(model: CodexModel): string {
+    const supported = model.supportedReasoningEfforts
+      .map((effort) => effort.reasoningEffort)
+      .join(', ');
+    return supported ? `Effort: ${supported}` : 'Uses the model default effort';
+  }
+
+  private async runAgent(
+    prompt: string,
+    reviewCommentIds: readonly string[] = [],
+    selected?: SelectedCodexSettings,
+  ): Promise<void> {
     const state = this.requireState();
     if (!state) {
       return;
@@ -484,10 +580,13 @@ class VirtualPrController implements vscode.Disposable {
     await this.save();
     this.tree.refresh();
     await this.renderCommentThreads();
-    this.output.appendLine(`\n[Virtual PR] Starting Codex in ${this.root}\n`);
+    const selectionLabel = selected
+      ? ` with ${selected.model}${selected.effort ? ` / ${selected.effort}` : ''}`
+      : ' with Codex defaults';
+    this.output.appendLine(`\n[Virtual PR] Starting Codex in ${this.root}${selectionLabel}\n`);
 
     try {
-      const binary = await discoverCodexPath();
+      const binary = selected?.binary || await discoverCodexPath();
       const approvalPolicy = vscode.workspace.getConfiguration('virtualPr')
         .get<'never' | 'on-request' | 'untrusted'>('codexApprovalPolicy', 'never');
       const result = await vscode.window.withProgress(
@@ -499,7 +598,11 @@ class VirtualPrController implements vscode.Disposable {
           prompt,
           approvalPolicy,
           this.output,
-          reviewCommentIds.length > 0 ? REVIEW_OUTPUT_SCHEMA : undefined,
+          {
+            outputSchema: reviewCommentIds.length > 0 ? REVIEW_OUTPUT_SCHEMA : undefined,
+            model: selected?.model,
+            effort: selected?.effort,
+          },
         ),
       );
       state.codexThreadId = result.threadId;

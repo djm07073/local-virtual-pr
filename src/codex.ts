@@ -3,7 +3,12 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import * as vscode from 'vscode';
-import { isAppServerHelp } from './core';
+import {
+  buildCodexTurnParams,
+  CodexModel,
+  isAppServerHelp,
+  normalizeCodexModels,
+} from './core';
 
 type ApprovalPolicy = 'never' | 'on-request' | 'untrusted';
 
@@ -21,6 +26,12 @@ interface PendingRequest {
 interface TurnResult {
   threadId: string;
   message: string;
+}
+
+export interface CodexRunSettings {
+  outputSchema?: Record<string, unknown>;
+  model?: string;
+  effort?: string;
 }
 
 function supportsAppServer(candidate: string): Promise<boolean> {
@@ -112,23 +123,19 @@ export class CodexAppServer {
     prompt: string,
     approvalPolicy: ApprovalPolicy,
     output: vscode.OutputChannel,
-    outputSchema?: Record<string, unknown>,
+    settings: CodexRunSettings = {},
   ): Promise<TurnResult> {
     const server = new CodexAppServer(binary, cwd, output);
     try {
-      await server.request('initialize', {
-        clientInfo: { name: 'local-virtual-pr', title: 'Local Virtual PR', version: '0.6.0' },
-        capabilities: { experimentalApi: false, requestAttestation: false },
-      });
-      server.notify('initialized');
+      await server.initialize();
       const threadId = await server.openThread(existingThreadId, approvalPolicy);
-      const response = await server.request('turn/start', {
+      const response = await server.request('turn/start', buildCodexTurnParams({
         threadId,
-        input: [{ type: 'text', text: prompt, text_elements: [] }],
+        prompt,
         cwd,
         approvalPolicy,
-        ...(outputSchema ? { outputSchema } : {}),
-      }) as { turn: { id: string } };
+        ...settings,
+      })) as { turn: { id: string } };
       const completion = await server.waitForTurn(response.turn.id);
       if (completion.status !== 'completed') {
         throw new Error(completion.error || `Codex turn ended with ${completion.status}.`);
@@ -137,6 +144,33 @@ export class CodexAppServer {
     } finally {
       server.dispose();
     }
+  }
+
+  static async listModels(
+    binary: string,
+    cwd: string,
+    output: vscode.OutputChannel,
+  ): Promise<CodexModel[]> {
+    const server = new CodexAppServer(binary, cwd, output);
+    try {
+      await server.initialize();
+      const response = await server.request('model/list', { limit: 100, includeHidden: false });
+      const models = normalizeCodexModels(response);
+      if (models.length === 0) {
+        throw new Error('Codex App Server returned no selectable models.');
+      }
+      return models;
+    } finally {
+      server.dispose();
+    }
+  }
+
+  private async initialize(): Promise<void> {
+    await this.request('initialize', {
+      clientInfo: { name: 'local-virtual-pr', title: 'Local Virtual PR', version: '0.7.0' },
+      capabilities: { experimentalApi: false, requestAttestation: false },
+    });
+    this.notify('initialized');
   }
 
   private async openThread(existingThreadId: string | undefined, approvalPolicy: ApprovalPolicy): Promise<string> {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0
+
+- Load the available model catalog and supported reasoning efforts from Codex App Server.
+- Prompt for a model and effort whenever Send Review to AI is invoked.
+- Remember the previous selection and pass it explicitly to the Codex turn.
+
 ## 0.6.0
 
 - Save reviewer replies locally without starting Codex immediately.

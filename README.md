@@ -12,6 +12,7 @@ VS Code에서 로컬 AI 변경사항을 Pull Request처럼 검토하는 비공�
 - 실제 source editor에서 심볼 탐색 지원
 - 변경된 줄을 드래그하고 gutter `+`를 눌러 로컬 리뷰 댓글 작성
 - 여러 리뷰 댓글을 같은 Codex 세션으로 전달
+- Send Review 실행마다 Codex 모델과 reasoning effort 선택
 - Codex 답변을 원래 댓글 아래 답글로 표시
 - 후속 답글을 로컬에 모은 뒤 Send Review로 일괄 전송
 - 원본 리뷰 댓글과 리뷰어 후속 답글 편집
@@ -41,7 +42,7 @@ VS Code에서 로컬 AI 변경사항을 Pull Request처럼 검토하는 비공�
 ### 터미널에서 설치
 
 ```sh
-code --install-extension ./local-virtual-pr-0.6.0.vsix
+code --install-extension ./local-virtual-pr-0.7.0.vsix
 ```
 
 제거하려면:
@@ -88,7 +89,13 @@ Virtual PR을 다시 생성하면 기존 로컬 리뷰 댓글과 연결된 Codex
 
 ### 4. Codex에 리뷰 전달하기
 
-**Virtual PR: Send Review to AI**를 실행하면 해결되지 않은 댓글이 같은 Codex 세션으로 전달됩니다.
+**Virtual PR: Send Review to AI**를 실행하면 먼저 Codex 모델과 reasoning effort를 선택하고, 해결되지 않은 댓글을 같은 Codex 세션으로 전달합니다.
+
+- 모델 목록과 각 모델이 지원하는 effort는 현재 로그인된 Codex App Server에서 동적으로 가져옵니다.
+- 이전에 사용한 모델과 effort가 다음 선택창의 맨 위에 표시됩니다.
+- 선택한 값은 이번 요청의 `turn/start`에 명시적으로 적용됩니다.
+- 모델이 effort 선택을 지원하지 않으면 해당 모델의 기본 effort를 사용합니다.
+- **Virtual PR: Ask AI to Implement**는 별도의 선택창 없이 Codex 기본 설정을 계속 사용합니다.
 
 Codex는 다음 작업을 수행합니다.
 
@@ -145,7 +152,7 @@ npx vsce package --no-dependencies
 생성된 VSIX는 다음 명령으로 설치할 수 있습니다.
 
 ```sh
-code --install-extension ./local-virtual-pr-0.6.0.vsix --force
+code --install-extension ./local-virtual-pr-0.7.0.vsix --force
 ```
 
 ## 제한사항

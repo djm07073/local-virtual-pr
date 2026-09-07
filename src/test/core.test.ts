@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   appendReviewReply,
+  buildCodexTurnParams,
   buildReviewPrompt,
   editReviewMessage,
   isAppServerHelp,
@@ -9,11 +10,107 @@ import {
   parseHeadRanges,
   parseNameStatusZ,
   parseReviewResponse,
+  normalizeCodexModels,
+  prioritizeCodexEfforts,
+  prioritizeCodexModels,
   retainChangedViewedFiles,
   relocateAnchor,
   ReviewComment,
   setFileViewed,
 } from '../core';
+
+test('Codex model list keeps selectable models and their supported efforts', () => {
+  assert.deepEqual(normalizeCodexModels({
+    data: [
+      {
+        id: 'gpt-default',
+        model: 'gpt-default',
+        displayName: 'GPT Default',
+        hidden: false,
+        defaultReasoningEffort: 'medium',
+        supportedReasoningEfforts: [
+          { reasoningEffort: 'low', description: 'Fast' },
+          { reasoningEffort: 'medium', description: 'Balanced' },
+        ],
+        isDefault: true,
+      },
+      {
+        id: 'gpt-hidden',
+        model: 'gpt-hidden',
+        displayName: 'GPT Hidden',
+        hidden: true,
+        defaultReasoningEffort: 'high',
+        supportedReasoningEfforts: [],
+        isDefault: false,
+      },
+      { id: '', model: '', displayName: '', supportedReasoningEfforts: [] },
+    ],
+  }), [
+    {
+      id: 'gpt-default',
+      model: 'gpt-default',
+      displayName: 'GPT Default',
+      defaultReasoningEffort: 'medium',
+      supportedReasoningEfforts: [
+        { reasoningEffort: 'low', description: 'Fast' },
+        { reasoningEffort: 'medium', description: 'Balanced' },
+      ],
+      isDefault: true,
+    },
+  ]);
+});
+
+test('Codex choices put the saved selection ahead of server defaults', () => {
+  const models = [
+    { id: 'other-model', model: 'other-model', displayName: 'Other', supportedReasoningEfforts: [], isDefault: false },
+    { id: 'default-model', model: 'default-model', displayName: 'Default', supportedReasoningEfforts: [], isDefault: true },
+    { id: 'saved-model', model: 'saved-model', displayName: 'Saved', supportedReasoningEfforts: [], isDefault: false },
+  ];
+  const efforts = [
+    { reasoningEffort: 'low' },
+    { reasoningEffort: 'medium' },
+    { reasoningEffort: 'high' },
+  ];
+
+  assert.deepEqual(prioritizeCodexModels(models, 'saved-model'), [models[2], models[1], models[0]]);
+  assert.deepEqual(prioritizeCodexModels(models, 'missing-model'), [models[1], models[0], models[2]]);
+  assert.deepEqual(prioritizeCodexEfforts(efforts, 'high', 'medium'), [efforts[2], efforts[1], efforts[0]]);
+  assert.deepEqual(prioritizeCodexEfforts(efforts, 'missing', 'medium'), [efforts[1], efforts[0], efforts[2]]);
+});
+
+test('Codex turn parameters include selected model and effort only when provided', async (t) => {
+  const cases = [
+    {
+      name: 'selected model and effort',
+      input: { model: 'gpt-selected', effort: 'high' },
+      expectedOverrides: { model: 'gpt-selected', effort: 'high' },
+    },
+    {
+      name: 'Codex defaults',
+      input: {},
+      expectedOverrides: {},
+    },
+  ];
+  for (const row of cases) {
+    await t.test(row.name, () => {
+      assert.deepEqual(buildCodexTurnParams({
+        threadId: 'thread-1',
+        prompt: 'Apply the review.',
+        cwd: '/workspace',
+        approvalPolicy: 'never',
+        outputSchema: { type: 'object' },
+        ...row.input,
+      }), {
+        threadId: 'thread-1',
+        input: [{ type: 'text', text: 'Apply the review.', text_elements: [] }],
+        cwd: '/workspace',
+        approvalPolicy: 'never',
+        outputSchema: { type: 'object' },
+        ...row.expectedOverrides,
+      });
+    });
+  }
+});
 
 test('Codex discovery rejects legacy CLI help that lacks app-server support', () => {
   assert.equal(isAppServerHelp('Usage: codex [OPTIONS] [PROMPT] <COMMAND>'), false);
