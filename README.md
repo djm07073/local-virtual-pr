@@ -16,7 +16,7 @@ VS Code에서 로컬 AI 변경사항을 Pull Request처럼 검토하는 비공�
 - Send Review 실행마다 Codex 모델과 reasoning effort 선택
 - Codex 답변을 원래 댓글 아래 답글로 표시
 - 후속 답글을 로컬에 모은 뒤 Send Review로 일괄 전송
-- 원본 리뷰 댓글과 리뷰어 후속 답글 편집
+- 원본 리뷰 댓글과 리뷰어 후속 답글 편집·삭제
 - AI가 코드를 수정해도 댓글 위치를 문맥으로 재탐색
 - 사람이 직접 Resolve하고 로컬 승인
 
@@ -43,7 +43,7 @@ VS Code에서 로컬 AI 변경사항을 Pull Request처럼 검토하는 비공�
 ### 터미널에서 설치
 
 ```sh
-code --install-extension ./local-virtual-pr-0.7.1.vsix
+code --install-extension ./local-virtual-pr-0.8.0.vsix
 ```
 
 제거하려면:
@@ -89,6 +89,8 @@ Virtual PR을 새 base로 교체하면 기존 로컬 리뷰 댓글과 연결된 
 `+`가 보이지 않으면 **Virtual PR: Refresh**를 실행하고 diff 또는 source 파일을 다시 여세요. 우클릭 후 **Virtual PR: Add Review Comment**를 실행하는 방법도 사용할 수 있습니다.
 
 작성한 원본 리뷰 댓글이나 후속 답글을 수정하려면 댓글 우측의 연필 버튼을 누릅니다. 원본 댓글은 왼쪽 Review comments 목록의 연필 버튼으로도 수정할 수 있습니다. Resolve된 댓글도 편집할 수 있으며 편집 후에도 Resolve 상태는 유지됩니다. Codex 답글은 수정할 수 없습니다.
+
+삭제하려면 댓글 우측이나 왼쪽 Review comments 목록의 휴지통 버튼을 누릅니다. 원본 리뷰 댓글을 삭제하면 확인 후 해당 스레드와 모든 답글이 함께 삭제됩니다. 리뷰어가 작성한 후속 답글은 해당 답글만 삭제되며 Codex 답글은 삭제할 수 없습니다. Codex가 작업 중일 때는 댓글을 삭제할 수 없습니다.
 
 ### 4. Codex에 리뷰 전달하기
 
@@ -155,7 +157,7 @@ npx vsce package --no-dependencies
 생성된 VSIX는 다음 명령으로 설치할 수 있습니다.
 
 ```sh
-code --install-extension ./local-virtual-pr-0.7.1.vsix --force
+code --install-extension ./local-virtual-pr-0.8.0.vsix --force
 ```
 
 ## 제한사항

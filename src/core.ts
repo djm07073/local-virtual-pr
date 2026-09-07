@@ -289,6 +289,40 @@ export function editReviewMessage(
   return updated;
 }
 
+export function deleteReviewMessage(
+  comments: readonly ReviewComment[],
+  target: ReviewMessageTarget,
+): ReviewComment[] {
+  if (!target.replyId) {
+    if (!comments.some((comment) => comment.id === target.commentId)) {
+      throw new Error('Unknown review comment or reply.');
+    }
+    return comments.filter((comment) => comment.id !== target.commentId);
+  }
+
+  let found = false;
+  const updated = comments.map((comment) => {
+    if (comment.id !== target.commentId) {
+      return comment;
+    }
+    const replies = (comment.replies || []).filter((reply) => {
+      if (reply.id !== target.replyId) {
+        return true;
+      }
+      if (reply.author !== 'reviewer') {
+        throw new Error('Codex replies cannot be deleted.');
+      }
+      found = true;
+      return false;
+    });
+    return { ...comment, replies };
+  });
+  if (!found) {
+    throw new Error('Unknown review comment or reply.');
+  }
+  return updated;
+}
+
 export function markReviewerRepliesSent(
   comments: readonly ReviewComment[],
   commentIds: readonly string[],

@@ -5,6 +5,7 @@ import {
   appendReviewReply,
   buildReviewPrompt,
   CodexModel,
+  deleteReviewMessage,
   editReviewMessage,
   FileChange,
   markReviewerRepliesSent,
@@ -116,6 +117,7 @@ class VirtualPrController implements vscode.Disposable {
       vscode.commands.registerCommand('virtualPr.unmarkViewed', (target: FileChange | TreeNode) => this.setViewed(target, false)),
       vscode.commands.registerCommand('virtualPr.addComment', (reply?: vscode.CommentReply) => this.addComment(reply)),
       vscode.commands.registerCommand('virtualPr.editComment', (target?: ReviewComment | vscode.Comment | TreeNode) => this.editComment(target)),
+      vscode.commands.registerCommand('virtualPr.deleteComment', (target?: ReviewComment | vscode.Comment | vscode.CommentThread | TreeNode) => this.deleteComment(target)),
       vscode.commands.registerCommand('virtualPr.resolveComment', (target: ReviewComment | vscode.CommentThread | TreeNode) => this.setCommentStatus(target, 'resolved')),
       vscode.commands.registerCommand('virtualPr.reopenComment', (target: ReviewComment | vscode.CommentThread | TreeNode) => this.setCommentStatus(target, 'open')),
       vscode.commands.registerCommand('virtualPr.askAI', () => this.askAI()),
@@ -387,15 +389,7 @@ class VirtualPrController implements vscode.Disposable {
     if (!state || !target) {
       return;
     }
-    const editableTarget = 'type' in target
-      ? target.type === 'comment' ? target.comment : undefined
-      : target;
-    if (!editableTarget) {
-      return;
-    }
-    const messageTarget: ReviewMessageTarget | undefined = 'id' in editableTarget && 'file' in editableTarget
-      ? { commentId: editableTarget.id }
-      : this.renderedCommentTargets.get(editableTarget as vscode.Comment);
+    const messageTarget = this.reviewMessageTarget(target);
     if (!messageTarget) {
       return;
     }
@@ -429,6 +423,64 @@ class VirtualPrController implements vscode.Disposable {
     await this.save();
     await this.renderCommentThreads();
     this.tree.refresh();
+  }
+
+  private async deleteComment(
+    target: ReviewComment | vscode.Comment | vscode.CommentThread | TreeNode | undefined,
+  ): Promise<void> {
+    const state = this.requireState();
+    if (!state || !target) {
+      return;
+    }
+    if (state.status === 'ai-working') {
+      void vscode.window.showInformationMessage('Review comments cannot be deleted while Codex is working.');
+      return;
+    }
+    const messageTarget = this.reviewMessageTarget(target);
+    if (!messageTarget) {
+      return;
+    }
+
+    const comment = state.comments.find((candidate) => candidate.id === messageTarget.commentId);
+    const reviewerReply = messageTarget.replyId
+      ? comment?.replies?.find((reply) => reply.id === messageTarget.replyId && reply.author === 'reviewer')
+      : undefined;
+    if (!comment || (messageTarget.replyId && !reviewerReply)) {
+      return;
+    }
+    const choice = await vscode.window.showWarningMessage(
+      messageTarget.replyId
+        ? 'Delete this review follow-up?'
+        : 'Delete this review comment and all of its replies?',
+      { modal: true },
+      'Delete',
+    );
+    if (choice !== 'Delete') {
+      return;
+    }
+
+    state.comments = deleteReviewMessage(state.comments, messageTarget);
+    await this.save();
+    await this.renderCommentThreads();
+    this.tree.refresh();
+  }
+
+  private reviewMessageTarget(
+    target: ReviewComment | vscode.Comment | vscode.CommentThread | TreeNode,
+  ): ReviewMessageTarget | undefined {
+    if ('uri' in target && 'comments' in target) {
+      const commentId = [...this.commentThreads].find(([, thread]) => thread === target)?.[0];
+      return commentId ? { commentId } : undefined;
+    }
+    const message = 'type' in target
+      ? target.type === 'comment' ? target.comment : undefined
+      : target;
+    if (!message) {
+      return undefined;
+    }
+    return 'id' in message && 'file' in message
+      ? { commentId: message.id }
+      : this.renderedCommentTargets.get(message as vscode.Comment);
   }
 
   private async setCommentStatus(

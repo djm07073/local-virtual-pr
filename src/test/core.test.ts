@@ -4,6 +4,7 @@ import {
   appendReviewReply,
   buildCodexTurnParams,
   buildReviewPrompt,
+  deleteReviewMessage,
   editReviewMessage,
   isAppServerHelp,
   markReviewerRepliesSent,
@@ -407,6 +408,70 @@ test('editing review messages preserves resolution and protects Codex replies', 
     ),
     /Codex replies cannot be edited/,
   );
+});
+
+test('deleting review messages', async (t) => {
+  const comments: ReviewComment[] = [
+    {
+      id: 'comment-1',
+      file: 'src/retry.ts',
+      startLine: 10,
+      endLine: 10,
+      selectedCode: 'await wait(delay);',
+      contextBefore: [],
+      contextAfter: [],
+      message: 'Original review.',
+      status: 'open',
+      replies: [
+        {
+          id: 'reviewer-reply',
+          author: 'reviewer',
+          message: 'Reviewer follow-up.',
+          createdAt: '2026-09-06T01:00:00.000Z',
+        },
+        {
+          id: 'codex-reply',
+          author: 'codex',
+          message: 'Codex response.',
+          createdAt: '2026-09-06T01:01:00.000Z',
+        },
+      ],
+    },
+    {
+      id: 'comment-2',
+      file: 'src/keep.ts',
+      startLine: 2,
+      endLine: 2,
+      selectedCode: 'keep();',
+      contextBefore: [],
+      contextAfter: [],
+      message: 'Keep this review.',
+      status: 'resolved',
+    },
+  ];
+
+  await t.test('removes an original comment and its thread', () => {
+    const updated = deleteReviewMessage(comments, { commentId: 'comment-1' });
+    assert.deepEqual(updated.map((comment) => comment.id), ['comment-2']);
+    assert.equal(comments.length, 2);
+  });
+  await t.test('removes only the selected reviewer follow-up', () => {
+    const updated = deleteReviewMessage(comments, { commentId: 'comment-1', replyId: 'reviewer-reply' });
+    assert.deepEqual(updated[0].replies?.map((reply) => reply.id), ['codex-reply']);
+    assert.deepEqual(comments[0].replies?.map((reply) => reply.id), ['reviewer-reply', 'codex-reply']);
+  });
+  await t.test('protects Codex replies', () => {
+    assert.throws(
+      () => deleteReviewMessage(comments, { commentId: 'comment-1', replyId: 'codex-reply' }),
+      /Codex replies cannot be deleted/,
+    );
+  });
+  await t.test('rejects an unknown target', () => {
+    assert.throws(
+      () => deleteReviewMessage(comments, { commentId: 'missing' }),
+      /Unknown review comment or reply/,
+    );
+  });
 });
 
 test('batch review prompt marks new follow-ups and clears them after delivery', () => {

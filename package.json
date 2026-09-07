@@ -2,7 +2,7 @@
   "name": "local-virtual-pr",
   "displayName": "Local Virtual PR",
   "description": "Review local AI changes like a pull request while keeping VS Code symbol navigation available.",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "publisher": "local",
   "license": "MIT",
   "repository": {
@@ -75,6 +75,11 @@
         "command": "virtualPr.editComment",
         "title": "Virtual PR: Edit Review Comment",
         "icon": "$(edit)"
+      },
+      {
+        "command": "virtualPr.deleteComment",
+        "title": "Virtual PR: Delete Review Comment",
+        "icon": "$(trash)"
       },
       {
         "command": "virtualPr.resolveComment",
@@ -217,6 +222,21 @@
           "command": "virtualPr.editComment",
           "when": "view == virtualPr.review && viewItem == virtualPr.comment.resolved",
           "group": "inline@2"
+        },
+        {
+          "command": "virtualPr.deleteComment",
+          "when": "view == virtualPr.review && viewItem == virtualPr.comment.open",
+          "group": "inline@3"
+        },
+        {
+          "command": "virtualPr.deleteComment",
+          "when": "view == virtualPr.review && viewItem == virtualPr.comment.outdated",
+          "group": "inline@3"
+        },
+        {
+          "command": "virtualPr.deleteComment",
+          "when": "view == virtualPr.review && viewItem == virtualPr.comment.resolved",
+          "group": "inline@3"
         }
       ],
       "editor/context": [
@@ -258,18 +278,43 @@
           "command": "virtualPr.reopenComment",
           "when": "commentController == localVirtualPr && commentThread == virtualPr.comment.resolved",
           "group": "navigation@1"
+        },
+        {
+          "command": "virtualPr.deleteComment",
+          "when": "commentController == localVirtualPr && commentThread == virtualPr.comment.open",
+          "group": "navigation@2"
+        },
+        {
+          "command": "virtualPr.deleteComment",
+          "when": "commentController == localVirtualPr && commentThread == virtualPr.comment.outdated",
+          "group": "navigation@2"
+        },
+        {
+          "command": "virtualPr.deleteComment",
+          "when": "commentController == localVirtualPr && commentThread == virtualPr.comment.resolved",
+          "group": "navigation@2"
         }
       ],
       "comments/comment/title": [
         {
           "command": "virtualPr.editComment",
           "when": "commentController == localVirtualPr && comment == virtualPr.comment.editable",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "command": "virtualPr.editComment",
           "when": "commentController == localVirtualPr && comment == virtualPr.reply.reviewer",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "virtualPr.deleteComment",
+          "when": "commentController == localVirtualPr && comment == virtualPr.comment.editable",
+          "group": "navigation@2"
+        },
+        {
+          "command": "virtualPr.deleteComment",
+          "when": "commentController == localVirtualPr && comment == virtualPr.reply.reviewer",
+          "group": "navigation@2"
         }
       ],
       "comments/comment/context": [
@@ -279,6 +324,14 @@
         },
         {
           "command": "virtualPr.editComment",
+          "when": "commentController == localVirtualPr && comment == virtualPr.reply.reviewer"
+        },
+        {
+          "command": "virtualPr.deleteComment",
+          "when": "commentController == localVirtualPr && comment == virtualPr.comment.editable"
+        },
+        {
+          "command": "virtualPr.deleteComment",
           "when": "commentController == localVirtualPr && comment == virtualPr.reply.reviewer"
         }
       ]

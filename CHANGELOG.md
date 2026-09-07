@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0
+
+- Add delete buttons to review comments in the review tree and editor comment UI.
+- Delete an original review comment together with its entire reply thread after confirmation.
+- Delete reviewer follow-ups individually while keeping Codex replies protected.
+- Prevent comment deletion while Codex is working on the review.
+
 ## 0.7.1
 
 - Add a dedicated Reset command that immediately clears the local Virtual PR state.
