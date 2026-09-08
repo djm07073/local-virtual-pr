@@ -13,6 +13,7 @@ VS Code에서 로컬 AI 변경사항을 Pull Request처럼 검토하는 비공�
 - 실제 source editor에서 심볼 탐색 지원
 - 변경된 줄을 드래그하고 gutter `+`를 눌러 로컬 리뷰 댓글 작성
 - 여러 리뷰 댓글을 같은 Codex 세션으로 전달
+- unresolved 리뷰 스레드를 AI용 프롬프트로 클립보드에 복사
 - Send Review 실행마다 Codex 모델과 reasoning effort 선택
 - Codex 답변을 원래 댓글 아래 답글로 표시
 - 후속 답글을 로컬에 모은 뒤 Send Review로 일괄 전송
@@ -44,7 +45,7 @@ VS Code에서 로컬 AI 변경사항을 Pull Request처럼 검토하는 비공�
 ### 터미널에서 설치
 
 ```sh
-code --install-extension ./local-virtual-pr-0.9.1.vsix
+code --install-extension ./local-virtual-pr-0.10.0.vsix
 ```
 
 제거하려면:
@@ -96,6 +97,8 @@ Virtual PR을 새 base로 교체하면 기존 로컬 리뷰 댓글과 연결된 
 현재 리뷰 댓글을 한 번에 모두 지우려면 **Review comments** 그룹 우측의 전체 지우기 버튼이나 Command Palette의 **Virtual PR: Clear All Review Comments**를 실행합니다. 원본 댓글과 모든 답글만 삭제되며 기존 Codex task 연결, 모델과 effort 선택, Viewed 상태, base ref는 유지됩니다. 이후 새 댓글을 작성해 같은 Codex task로 계속 요청할 수 있습니다.
 
 ### 4. Codex에 리뷰 전달하기
+
+Codex를 바로 실행하지 않고 프롬프트만 사용하려면 상단 또는 **Review comments** 그룹 우측의 복사 버튼을 누르거나 Command Palette에서 **Virtual PR: Copy Unresolved Review Prompt**를 실행합니다. unresolved 스레드의 파일과 줄, 선택 코드, 원본 댓글, Codex 답글, 리뷰어 후속 답글이 `Send Review to AI`와 같은 형식으로 클립보드에 복사됩니다. resolved 스레드는 제외되며 Codex task와 리뷰 상태는 변경되지 않습니다.
 
 **Virtual PR: Send Review to AI**를 실행하면 먼저 Codex 모델과 reasoning effort를 선택하고, 해결되지 않은 댓글을 같은 Codex 세션으로 전달합니다.
 
@@ -160,7 +163,7 @@ npx vsce package --no-dependencies
 생성된 VSIX는 다음 명령으로 설치할 수 있습니다.
 
 ```sh
-code --install-extension ./local-virtual-pr-0.9.1.vsix --force
+code --install-extension ./local-virtual-pr-0.10.0.vsix --force
 ```
 
 ## 제한사항

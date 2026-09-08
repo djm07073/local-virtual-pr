@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0
+
+- Copy all unresolved review threads as an AI-ready prompt without starting Codex.
+- Reuse the Send Review prompt format, including source context and thread replies.
+- Keep the Codex task and local review state unchanged when copying.
+
 ## 0.9.1
 
 - Prevent overlapping asynchronous comment renders from creating duplicate editor threads.

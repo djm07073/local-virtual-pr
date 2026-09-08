@@ -2,7 +2,7 @@
   "name": "local-virtual-pr",
   "displayName": "Local Virtual PR",
   "description": "Review local AI changes like a pull request while keeping VS Code symbol navigation available.",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "publisher": "local",
   "license": "MIT",
   "repository": {
@@ -107,6 +107,11 @@
         "icon": "$(send)"
       },
       {
+        "command": "virtualPr.copyReviewPrompt",
+        "title": "Virtual PR: Copy Unresolved Review Prompt",
+        "icon": "$(copy)"
+      },
+      {
         "command": "virtualPr.replyToComment",
         "title": "Reply",
         "icon": "$(reply)"
@@ -162,26 +167,36 @@
           "group": "navigation@4"
         },
         {
-          "command": "virtualPr.sendReview",
+          "command": "virtualPr.copyReviewPrompt",
           "when": "view == virtualPr.review",
           "group": "navigation@5"
         },
         {
-          "command": "virtualPr.approve",
+          "command": "virtualPr.sendReview",
           "when": "view == virtualPr.review",
           "group": "navigation@6"
         },
         {
-          "command": "virtualPr.showOutput",
+          "command": "virtualPr.approve",
           "when": "view == virtualPr.review",
           "group": "navigation@7"
+        },
+        {
+          "command": "virtualPr.showOutput",
+          "when": "view == virtualPr.review",
+          "group": "navigation@8"
         }
       ],
       "view/item/context": [
         {
-          "command": "virtualPr.clearComments",
+          "command": "virtualPr.copyReviewPrompt",
           "when": "view == virtualPr.review && viewItem == virtualPr.group.comments",
           "group": "inline@1"
+        },
+        {
+          "command": "virtualPr.clearComments",
+          "when": "view == virtualPr.review && viewItem == virtualPr.group.comments",
+          "group": "inline@2"
         },
         {
           "command": "virtualPr.openSource",

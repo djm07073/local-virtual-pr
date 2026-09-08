@@ -125,6 +125,7 @@ class VirtualPrController implements vscode.Disposable {
       vscode.commands.registerCommand('virtualPr.resolveComment', (target: ReviewComment | vscode.CommentThread | TreeNode) => this.setCommentStatus(target, 'resolved')),
       vscode.commands.registerCommand('virtualPr.reopenComment', (target: ReviewComment | vscode.CommentThread | TreeNode) => this.setCommentStatus(target, 'open')),
       vscode.commands.registerCommand('virtualPr.askAI', () => this.askAI()),
+      vscode.commands.registerCommand('virtualPr.copyReviewPrompt', () => this.copyReviewPrompt()),
       vscode.commands.registerCommand('virtualPr.sendReview', () => this.sendReview()),
       vscode.commands.registerCommand('virtualPr.replyToComment', (reply: vscode.CommentReply) => this.addReply(reply)),
       vscode.commands.registerCommand('virtualPr.approve', () => this.approve()),
@@ -589,6 +590,23 @@ class VirtualPrController implements vscode.Disposable {
     await this.save();
     await this.renderCommentThreads();
     this.tree.refresh();
+  }
+
+  private async copyReviewPrompt(): Promise<void> {
+    const state = this.requireState();
+    if (!state) {
+      return;
+    }
+    const unresolved = state.comments.filter((comment) => comment.status !== 'resolved');
+    if (unresolved.length === 0) {
+      void vscode.window.showInformationMessage('There are no unresolved review comments to copy.');
+      return;
+    }
+
+    await vscode.env.clipboard.writeText(buildReviewPrompt(state.comments));
+    void vscode.window.showInformationMessage(
+      `Copied ${unresolved.length} unresolved review comment thread(s) to the clipboard.`,
+    );
   }
 
   private async sendReview(): Promise<void> {
